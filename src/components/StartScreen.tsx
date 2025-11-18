@@ -1,15 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Anchor } from 'lucide-react';
+import { Anchor, Save } from 'lucide-react';
+import { SaveManager } from '../utils/saveManager';
 
 export default function StartScreen() {
   const [companyName, setCompanyName] = useState('');
+  const [hasSave, setHasSave] = useState(false);
+  const [saveInfo, setSaveInfo] = useState<{ companyName: string; savedAt: string } | null>(null);
+
   const startGame = useGameStore((state) => state.startGame);
+  const loadGame = useGameStore((state) => state.loadGame);
+
+  useEffect(() => {
+    const savedGame = SaveManager.hasSavedGame();
+    setHasSave(savedGame);
+    if (savedGame) {
+      setSaveInfo(SaveManager.getSaveInfo());
+    }
+  }, []);
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     if (companyName.trim()) {
       startGame(companyName.trim());
+    }
+  };
+
+  const handleLoad = () => {
+    const success = loadGame();
+    if (!success) {
+      alert('저장된 게임을 불러오는데 실패했습니다.');
     }
   };
 
@@ -24,7 +44,35 @@ export default function StartScreen() {
           <p className="text-xl text-gray-300">조선소 경영 시뮬레이션</p>
         </div>
 
+        {/* 저장된 게임 불러오기 */}
+        {hasSave && saveInfo && (
+          <div className="card mb-4 bg-green-900/20 border-2 border-green-700">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Save className="w-5 h-5 text-green-400" />
+                  <h3 className="font-semibold text-white">저장된 게임 발견</h3>
+                </div>
+                <p className="text-sm text-gray-300">
+                  회사: <span className="font-semibold text-white">{saveInfo.companyName}</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  저장 시간: {new Date(saveInfo.savedAt).toLocaleString('ko-KR')}
+                </p>
+              </div>
+              <button
+                onClick={handleLoad}
+                className="btn-primary ml-4"
+                type="button"
+              >
+                불러오기
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="card">
+          <h2 className="text-xl font-bold text-white mb-4">새 게임 시작</h2>
           <form onSubmit={handleStart} className="space-y-6">
             <div>
               <label htmlFor="companyName" className="block text-sm font-medium text-gray-300 mb-2">

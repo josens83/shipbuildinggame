@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Briefcase } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,17 +10,13 @@ export default function Sales() {
     customers,
     bidOnContract,
     signContract,
+    generateBids,
   } = useGameStore();
 
   const [selectedBid, setSelectedBid] = useState<string | null>(null);
   const [bidAmount, setBidAmount] = useState<number>(0);
 
-  // 입찰 기회 생성 (데모용)
-  useEffect(() => {
-    if (availableBids.length === 0) {
-      // 나중에 구현: BidGenerator.generateBids(customers, currentDate, 5);
-    }
-  }, [availableBids.length]);
+  // useEffect 제거 - 이제 게임 시작 시 자동 생성됨
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -83,7 +79,9 @@ export default function Sales() {
           <div className="text-center py-12">
             <Briefcase className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">현재 입찰 가능한 계약이 없습니다</p>
-            <button className="btn-primary mt-4">새 입찰 기회 찾기</button>
+            <button onClick={generateBids} className="btn-primary mt-4">
+              새 입찰 기회 찾기
+            </button>
           </div>
         ) : (
           <div className="space-y-4">

@@ -1,14 +1,20 @@
 import { create } from 'zustand';
 import type { GameState, Dock, FinancialStatement, ContractStatus } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
+import { BidGenerator } from '../engine/bidGenerator';
+import { SaveManager } from '../utils/saveManager';
 
 interface GameActions {
   // 게임 제어
   startGame: (companyName: string) => void;
+  loadGame: () => boolean;
+  saveGame: () => boolean;
   pauseGame: () => void;
   advanceTime: (days: number) => void;
+  setGameSpeed: (speed: 1 | 2 | 3) => void;
 
   // 영업
+  generateBids: () => void;
   bidOnContract: (contractId: string, bidAmount: number) => void;
   signContract: (contractId: string) => void;
   cancelContract: (contractId: string) => void;
@@ -120,14 +126,44 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // 액션들
   startGame: (companyName: string) => {
     set({ companyName });
+    // 게임 시작 시 초기 입찰 생성
+    get().generateBids();
+    // 자동 저장 시작 (1분마다)
+    SaveManager.enableAutoSave(() => get(), 60000);
+  },
+
+  loadGame: () => {
+    const savedData = SaveManager.loadGame();
+    if (savedData) {
+      set(savedData as Partial<GameState & GameActions>);
+      // 자동 저장 재시작
+      SaveManager.enableAutoSave(() => get(), 60000);
+      return true;
+    }
+    return false;
+  },
+
+  saveGame: () => {
+    return SaveManager.saveGame(get());
   },
 
   pauseGame: () => {
     set({ gameSpeed: 1 });
   },
 
+  setGameSpeed: (speed: 1 | 2 | 3) => {
+    set({ gameSpeed: speed });
+  },
+
+  generateBids: () => {
+    const state = get();
+    const newBids = BidGenerator.generateBids(state.customers, state.currentDate, 3);
+    set({ availableBids: [...state.availableBids, ...newBids] });
+  },
+
   advanceTime: (days: number) => {
     const state = get();
+    const oldDate = new Date(state.currentDate);
     const newDate = new Date(state.currentDate);
     newDate.setDate(newDate.getDate() + days);
 
@@ -135,7 +171,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // 시간이 지나면 자동으로 업데이트
     get().updateProduction();
-    get().updateFinancials();
+
+    // 월이 바뀌면 재무 업데이트
+    if (oldDate.getMonth() !== newDate.getMonth()) {
+      get().updateFinancials();
+    }
+
+    // 7일마다 새로운 입찰 생성 (입찰이 3개 미만일 때)
+    const dayOfMonth = newDate.getDate();
+    if (dayOfMonth % 7 === 0 && state.availableBids.length < 3) {
+      get().generateBids();
+    }
   },
 
   bidOnContract: (contractId: string, bidAmount: number) => {

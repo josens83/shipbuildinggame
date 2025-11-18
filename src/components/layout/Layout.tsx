@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
 import {
@@ -11,6 +12,7 @@ import {
   Play,
   Pause,
   FastForward,
+  Save,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -27,6 +29,8 @@ export default function Layout({ children }: LayoutProps) {
     financials,
     reputation,
     advanceTime,
+    setGameSpeed,
+    saveGame,
   } = useGameStore();
 
   const navItems = [
@@ -36,8 +40,35 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/production', label: '생산', icon: Factory },
   ];
 
+  // 자동 시간 진행
+  useEffect(() => {
+    if (gameSpeed === 1) return; // 일시정지 상태
+
+    const interval = gameSpeed === 2 ? 2000 : 1000; // 2x: 2초마다, 3x: 1초마다
+    const timer = setInterval(() => {
+      advanceTime(1); // 1일 진행
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [gameSpeed, advanceTime]);
+
   const handleTimeAdvance = () => {
-    advanceTime(1); // 1일 진행
+    advanceTime(1); // 수동으로 1일 진행
+  };
+
+  const toggleGameSpeed = () => {
+    // 1 -> 2 -> 3 -> 1 순환
+    const nextSpeed = gameSpeed === 3 ? 1 : ((gameSpeed + 1) as 1 | 2 | 3);
+    setGameSpeed(nextSpeed);
+  };
+
+  const handleSave = () => {
+    const success = saveGame();
+    if (success) {
+      alert('게임이 저장되었습니다!');
+    } else {
+      alert('저장에 실패했습니다.');
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -133,24 +164,43 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleTimeAdvance}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-xs text-white"
+                  title="수동으로 1일 진행"
+                >
+                  +1일
+                </button>
+
+                <button
+                  onClick={toggleGameSpeed}
                   className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                  title="1일 진행"
+                  title={`속도: ${gameSpeed}x (클릭하여 변경)`}
                 >
                   {gameSpeed === 1 ? (
-                    <Play className="w-4 h-4 text-white" />
+                    <Pause className="w-4 h-4 text-gray-400" />
                   ) : gameSpeed === 2 ? (
-                    <FastForward className="w-4 h-4 text-white" />
+                    <Play className="w-4 h-4 text-green-400" />
                   ) : (
-                    <Pause className="w-4 h-4 text-white" />
+                    <FastForward className="w-4 h-4 text-blue-400" />
                   )}
                 </button>
 
-                <span className="text-sm text-gray-400">속도: {gameSpeed}x</span>
+                <span className="text-sm text-gray-400">
+                  {gameSpeed === 1 ? '일시정지' : `${gameSpeed}x 속도`}
+                </span>
               </div>
             </div>
 
             {/* 빠른 정보 */}
             <div className="flex items-center space-x-6 text-sm">
+              <button
+                onClick={handleSave}
+                className="flex items-center space-x-1 px-3 py-2 bg-green-700 hover:bg-green-600 rounded-lg transition-colors"
+                title="게임 저장"
+              >
+                <Save className="w-4 h-4 text-white" />
+                <span className="text-white text-xs font-semibold">저장</span>
+              </button>
+
               <div>
                 <span className="text-gray-400">순이익: </span>
                 <span
