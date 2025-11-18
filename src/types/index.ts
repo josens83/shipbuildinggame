@@ -151,9 +151,12 @@ export interface FinancialStatement {
   returnOnEquity: number;     // ROE
 }
 
+export type Difficulty = 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT';
+
 export interface GameState {
   // 메타 정보
   companyName: string;
+  difficulty: Difficulty;
   currentDate: Date;
   gameSpeed: 1 | 2 | 3;       // 게임 속도
 

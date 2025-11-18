@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
+import type { Difficulty } from '../types';
 import { Anchor, Save } from 'lucide-react';
 import { SaveManager } from '../utils/saveManager';
+import {
+  DIFFICULTY_NAMES,
+  DIFFICULTY_DESCRIPTIONS,
+  DIFFICULTY_COLORS,
+  getDifficultySettings,
+} from '../utils/difficultySettings';
 
 export default function StartScreen() {
   const [companyName, setCompanyName] = useState('');
+  const [difficulty, setDifficulty] = useState<Difficulty>('NORMAL');
   const [hasSave, setHasSave] = useState(false);
   const [saveInfo, setSaveInfo] = useState<{ companyName: string; savedAt: string } | null>(null);
 
@@ -22,9 +30,11 @@ export default function StartScreen() {
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     if (companyName.trim()) {
-      startGame(companyName.trim());
+      startGame(companyName.trim(), difficulty);
     }
   };
+
+  const settings = getDifficultySettings(difficulty);
 
   const handleLoad = () => {
     const success = loadGame();
@@ -90,13 +100,44 @@ export default function StartScreen() {
               />
             </div>
 
+            {/* 난이도 선택 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">난이도 선택</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['EASY', 'NORMAL', 'HARD', 'EXPERT'] as Difficulty[]).map((diff) => {
+                  const color = DIFFICULTY_COLORS[diff];
+                  const isSelected = difficulty === diff;
+                  return (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => setDifficulty(diff)}
+                      className={`p-3 rounded-lg border-2 transition-all text-left ${
+                        isSelected
+                          ? `border-${color}-500 bg-${color}-900/30`
+                          : 'border-gray-600 bg-gray-700/30 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className={`font-semibold ${isSelected ? `text-${color}-400` : 'text-white'}`}>
+                        {DIFFICULTY_NAMES[diff]}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1 line-clamp-2">
+                        {DIFFICULTY_DESCRIPTIONS[diff]}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="bg-gray-700/50 p-4 rounded-lg">
-              <h3 className="font-semibold text-white mb-2">게임 정보</h3>
+              <h3 className="font-semibold text-white mb-2">초기 조건 ({DIFFICULTY_NAMES[difficulty]})</h3>
               <ul className="text-sm text-gray-300 space-y-1">
-                <li>• 초기 자금: $50,000,000</li>
-                <li>• 시작 도크: 2개 (중형 1개, 소형 1개)</li>
-                <li>• 초기 인력: 330명</li>
-                <li>• 목표: 세계 최고의 조선소 건설</li>
+                <li>• 초기 자금: ${(settings.initialCash / 1_000_000).toFixed(0)}M</li>
+                <li>• 초기 부채: ${(settings.initialDebt / 1_000_000).toFixed(0)}M</li>
+                <li>• 시작 도크: {settings.initialDocks}개</li>
+                <li>• 시작 평판: {settings.initialReputation}/100</li>
+                <li>• 대출 이자율: {(settings.loanInterestRate * 100).toFixed(1)}%</li>
               </ul>
             </div>
 

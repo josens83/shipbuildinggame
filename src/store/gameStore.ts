@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
 import { INITIAL_COMPETITORS } from '../data/competitors';
 import { BidGenerator } from '../engine/bidGenerator';
@@ -7,10 +7,11 @@ import { SaveManager } from '../utils/saveManager';
 import { EventGenerator } from '../engine/eventGenerator';
 import { AVAILABLE_RESEARCH, getResearchById } from '../data/research';
 import { CompetitorAI } from '../engine/competitorAI';
+import { getDifficultySettings } from '../utils/difficultySettings';
 
 interface GameActions {
   // 게임 제어
-  startGame: (companyName: string) => void;
+  startGame: (companyName: string, difficulty?: import('../types').Difficulty) => void;
   loadGame: () => boolean;
   saveGame: () => boolean;
   pauseGame: () => void;
@@ -125,6 +126,7 @@ const INITIAL_DOCKS: Dock[] = [
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // 초기 상태
   companyName: '',
+  difficulty: 'NORMAL' as Difficulty,
   currentDate: new Date(2025, 0, 1), // 2025년 1월 1일
   gameSpeed: 1,
 
@@ -165,8 +167,45 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   competitors: [...INITIAL_COMPETITORS],
 
   // 액션들
-  startGame: (companyName: string) => {
-    set({ companyName });
+  startGame: (companyName: string, difficulty: Difficulty = 'NORMAL') => {
+    const settings = getDifficultySettings(difficulty);
+    const state = get();
+
+    // 난이도에 따른 초기 도크 설정
+    const initialDocks: Dock[] = [];
+    for (let i = 0; i < settings.initialDocks; i++) {
+      initialDocks.push({
+        id: `DOCK_${i + 1}`,
+        name: `Dock #${i + 1}`,
+        size: i === 0 ? 'MEDIUM' : 'SMALL',
+        status: 'AVAILABLE',
+        maxLength: i === 0 ? 300 : 200,
+        maxWidth: i === 0 ? 50 : 30,
+        efficiency: 0.8,
+        maintenanceCost: i === 0 ? 1.0 : 0.5,
+        condition: 100,
+      });
+    }
+
+    // 난이도에 따른 재무 설정
+    const totalAssets = settings.initialCash + 100_000_000; // 고정자산 1억
+    set({
+      companyName,
+      difficulty,
+      docks: initialDocks,
+      reputation: settings.initialReputation,
+      marketShare: settings.initialMarketShare,
+      financials: {
+        ...state.financials,
+        cash: settings.initialCash,
+        totalAssets,
+        longTermDebt: settings.initialDebt,
+        totalLiabilities: settings.initialDebt,
+        equity: settings.initialEquity,
+        debtToEquityRatio: settings.initialDebt / settings.initialEquity,
+      },
+    });
+
     // 게임 시작 시 초기 입찰 생성
     get().generateBids();
     // 자동 저장 시작 (1분마다)
