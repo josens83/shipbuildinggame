@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Shipyard Tycoon</string>
+    <string name="title_activity_main">Shipyard Tycoon</string>
+    <string name="package_name">com.shipyard.tycoon</string>
+    <string name="custom_url_scheme">com.shipyard.tycoon</string>
+</resources>
