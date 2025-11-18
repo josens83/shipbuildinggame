@@ -2,12 +2,14 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
+import EventNotification from '../common/EventNotification';
 import {
   Anchor,
   LayoutDashboard,
   Briefcase,
   DollarSign,
   Factory,
+  FlaskConical,
   Clock,
   Play,
   Pause,
@@ -28,9 +30,12 @@ export default function Layout({ children }: LayoutProps) {
     gameSpeed,
     financials,
     reputation,
+    activeEvent,
     advanceTime,
     setGameSpeed,
     saveGame,
+    closeEvent,
+    handleEventChoice,
   } = useGameStore();
 
   const navItems = [
@@ -38,6 +43,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/sales', label: '영업', icon: Briefcase },
     { path: '/finance', label: '재무', icon: DollarSign },
     { path: '/production', label: '생산', icon: Factory },
+    { path: '/research', label: '연구개발', icon: FlaskConical },
   ];
 
   // 자동 시간 진행
@@ -225,6 +231,15 @@ export default function Layout({ children }: LayoutProps) {
         {/* 페이지 컨텐츠 */}
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+
+      {/* 이벤트 알림 */}
+      {activeEvent && (
+        <EventNotification
+          event={activeEvent}
+          onClose={closeEvent}
+          onChoice={handleEventChoice}
+        />
+      )}
     </div>
   );
 }

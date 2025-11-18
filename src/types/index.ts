@@ -176,6 +176,14 @@ export interface GameState {
   totalRevenue: number;
   reputation: number;         // 0-100 회사 평판
   marketShare: number;        // 0-100 시장 점유율
+
+  // 이벤트
+  events: GameEvent[];        // 발생한 이벤트 기록
+  activeEvent: GameEvent | null;  // 현재 표시 중인 이벤트
+
+  // 연구 개발
+  researchProjects: ResearchProject[];  // 진행 중/완료된 연구들
+  activeResearchCount: number;          // 동시 진행 가능한 연구 수
 }
 
 // 이벤트 타입
@@ -189,4 +197,49 @@ export interface GameEvent {
     text: string;
     effect: () => void;
   }[];
+}
+
+// 기술 연구 타입
+export type ResearchCategory =
+  | 'PRODUCTION'     // 생산 효율
+  | 'QUALITY'        // 품질 관리
+  | 'COST'           // 원가 절감
+  | 'SPEED'          // 건조 속도
+  | 'SAFETY'         // 안전 관리
+  | 'AUTOMATION';    // 자동화
+
+export type ResearchStatus =
+  | 'AVAILABLE'      // 연구 가능
+  | 'IN_PROGRESS'    // 연구 중
+  | 'COMPLETED';     // 완료
+
+export interface Research {
+  id: string;
+  name: string;
+  category: ResearchCategory;
+  description: string;
+
+  // 연구 요구사항
+  cost: number;              // 연구 비용 (백만 달러)
+  duration: number;          // 연구 기간 (일)
+  requiredReputation: number; // 필요 평판
+  prerequisiteIds?: string[];  // 선행 연구 ID
+
+  // 효과
+  effects: {
+    dockEfficiency?: number;     // 도크 효율 증가 (%)
+    costReduction?: number;      // 원가 절감 (%)
+    buildSpeedBonus?: number;    // 건조 속도 증가 (%)
+    qualityBonus?: number;       // 품질 보너스 (%)
+    workerSafety?: number;       // 안전도 증가 (%)
+    reputationBonus?: number;    // 평판 보너스
+  };
+}
+
+export interface ResearchProject {
+  researchId: string;
+  status: ResearchStatus;
+  startDate?: Date;
+  progress: number;            // 0-100
+  completionDate?: Date;
 }

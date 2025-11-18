@@ -1,8 +1,10 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
 import { BidGenerator } from '../engine/bidGenerator';
 import { SaveManager } from '../utils/saveManager';
+import { EventGenerator } from '../engine/eventGenerator';
+import { AVAILABLE_RESEARCH, getResearchById } from '../data/research';
 
 interface GameActions {
   // 게임 제어
@@ -35,6 +37,28 @@ interface GameActions {
   // 도크
   buildDock: (size: 'SMALL' | 'MEDIUM' | 'LARGE' | 'MEGA') => void;
   upgradeDock: (dockId: string) => void;
+
+  // 이벤트
+  triggerEvent: (event: GameEvent) => void;
+  closeEvent: () => void;
+  handleEventChoice: (choiceIndex: number) => void;
+
+  // 이벤트 효과 헬퍼
+  increaseCash: (amount: number) => void;
+  decreaseCash: (amount: number) => void;
+  increaseReputation: (amount: number) => void;
+  decreaseReputation: (amount: number) => void;
+  increaseMarketShare: (amount: number) => void;
+  increaseDockEfficiency: () => void;
+  increaseMorale: () => void;
+  decreaseMorale: () => void;
+
+  // 연구 개발
+  startResearch: (researchId: string) => boolean;
+  updateResearch: () => void;
+  getAvailableResearch: () => Research[];
+  getCompletedResearch: () => string[];
+  canStartResearch: (researchId: string) => { canStart: boolean; reason?: string };
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -123,6 +147,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   reputation: 50,
   marketShare: 0,
 
+  // 이벤트
+  events: [],
+  activeEvent: null,
+
+  // 연구 개발
+  researchProjects: [],
+  activeResearchCount: 1, // 초기에는 1개만 동시 연구 가능
+
   // 액션들
   startGame: (companyName: string) => {
     set({ companyName });
@@ -171,6 +203,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // 시간이 지나면 자동으로 업데이트
     get().updateProduction();
+    get().updateResearch(); // 연구 진행도 업데이트
 
     // 월이 바뀌면 재무 업데이트
     if (oldDate.getMonth() !== newDate.getMonth()) {
@@ -181,6 +214,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const dayOfMonth = newDate.getDate();
     if (dayOfMonth % 7 === 0 && state.availableBids.length < 3) {
       get().generateBids();
+    }
+
+    // 랜덤 이벤트 발생 (활성 이벤트가 없을 때만)
+    if (!state.activeEvent) {
+      const randomEvent = EventGenerator.generateRandomEvent(newDate);
+      if (randomEvent) {
+        get().triggerEvent(randomEvent);
+      }
     }
   },
 
@@ -407,5 +448,269 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   upgradeDock: (_dockId: string) => {
     // 나중에 구현
+  },
+
+  // 이벤트 액션
+  triggerEvent: (event: GameEvent) => {
+    const state = get();
+    set({
+      activeEvent: event,
+      events: [...state.events, event],
+    });
+  },
+
+  closeEvent: () => {
+    set({ activeEvent: null });
+  },
+
+  handleEventChoice: (choiceIndex: number) => {
+    const state = get();
+    if (state.activeEvent && state.activeEvent.choices) {
+      const choice = state.activeEvent.choices[choiceIndex];
+      if (choice && choice.effect) {
+        choice.effect();
+      }
+    }
+    set({ activeEvent: null });
+  },
+
+  // 이벤트 효과 헬퍼 함수들
+  increaseCash: (amount: number) => {
+    const state = get();
+    set({
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash + amount,
+      },
+    });
+  },
+
+  decreaseCash: (amount: number) => {
+    const state = get();
+    set({
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash - amount,
+      },
+    });
+  },
+
+  increaseReputation: (amount: number) => {
+    const state = get();
+    set({ reputation: Math.min(100, state.reputation + amount) });
+  },
+
+  decreaseReputation: (amount: number) => {
+    const state = get();
+    set({ reputation: Math.max(0, state.reputation - amount) });
+  },
+
+  increaseMarketShare: (amount: number) => {
+    const state = get();
+    set({ marketShare: Math.min(100, state.marketShare + amount) });
+  },
+
+  increaseDockEfficiency: () => {
+    const state = get();
+    set({
+      docks: state.docks.map(dock => ({
+        ...dock,
+        efficiency: Math.min(1, dock.efficiency + 0.1),
+      })),
+    });
+  },
+
+  increaseMorale: () => {
+    const state = get();
+    set({
+      workforce: {
+        ...state.workforce,
+        morale: Math.min(100, state.workforce.morale + 10),
+      },
+    });
+  },
+
+  decreaseMorale: () => {
+    const state = get();
+    set({
+      workforce: {
+        ...state.workforce,
+        morale: Math.max(0, state.workforce.morale - 5),
+      },
+    });
+  },
+
+  // 연구 개발 액션들
+  getCompletedResearch: () => {
+    const state = get();
+    return state.researchProjects
+      .filter(p => p.status === 'COMPLETED')
+      .map(p => p.researchId);
+  },
+
+  canStartResearch: (researchId: string) => {
+    const state = get();
+    const research = getResearchById(researchId);
+
+    if (!research) {
+      return { canStart: false, reason: '연구를 찾을 수 없습니다.' };
+    }
+
+    // 이미 완료했거나 진행 중인지 확인
+    const existingProject = state.researchProjects.find(p => p.researchId === researchId);
+    if (existingProject) {
+      if (existingProject.status === 'COMPLETED') {
+        return { canStart: false, reason: '이미 완료된 연구입니다.' };
+      }
+      if (existingProject.status === 'IN_PROGRESS') {
+        return { canStart: false, reason: '이미 진행 중인 연구입니다.' };
+      }
+    }
+
+    // 동시 연구 한도 확인
+    const activeResearchCount = state.researchProjects.filter(p => p.status === 'IN_PROGRESS').length;
+    if (activeResearchCount >= state.activeResearchCount) {
+      return { canStart: false, reason: `동시에 ${state.activeResearchCount}개까지만 연구할 수 있습니다.` };
+    }
+
+    // 자금 확인
+    if (state.financials.cash < research.cost) {
+      return { canStart: false, reason: '자금이 부족합니다.' };
+    }
+
+    // 평판 확인
+    if (state.reputation < research.requiredReputation) {
+      return { canStart: false, reason: `평판이 ${research.requiredReputation} 이상 필요합니다.` };
+    }
+
+    // 선행 연구 확인
+    if (research.prerequisiteIds && research.prerequisiteIds.length > 0) {
+      const completedResearch = state.researchProjects
+        .filter(p => p.status === 'COMPLETED')
+        .map(p => p.researchId);
+
+      const missingPrerequisites = research.prerequisiteIds.filter(
+        id => !completedResearch.includes(id)
+      );
+
+      if (missingPrerequisites.length > 0) {
+        return { canStart: false, reason: '선행 연구를 먼저 완료해야 합니다.' };
+      }
+    }
+
+    return { canStart: true };
+  },
+
+  getAvailableResearch: () => {
+    const state = get();
+    const completedIds = state.researchProjects
+      .filter(p => p.status === 'COMPLETED')
+      .map(p => p.researchId);
+
+    const inProgressIds = state.researchProjects
+      .filter(p => p.status === 'IN_PROGRESS')
+      .map(p => p.researchId);
+
+    return AVAILABLE_RESEARCH.filter(research => {
+      // 이미 완료했거나 진행 중이면 제외
+      if (completedIds.includes(research.id) || inProgressIds.includes(research.id)) {
+        return false;
+      }
+
+      // 선행 연구 확인
+      if (research.prerequisiteIds && research.prerequisiteIds.length > 0) {
+        const hasAllPrerequisites = research.prerequisiteIds.every(
+          id => completedIds.includes(id)
+        );
+        if (!hasAllPrerequisites) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  },
+
+  startResearch: (researchId: string) => {
+    const state = get();
+    const canStart = get().canStartResearch(researchId);
+
+    if (!canStart.canStart) {
+      return false;
+    }
+
+    const research = getResearchById(researchId);
+    if (!research) {
+      return false;
+    }
+
+    const newProject: ResearchProject = {
+      researchId,
+      status: 'IN_PROGRESS',
+      startDate: new Date(state.currentDate),
+      progress: 0,
+    };
+
+    set({
+      researchProjects: [...state.researchProjects, newProject],
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash - research.cost,
+      },
+    });
+
+    return true;
+  },
+
+  updateResearch: () => {
+    const state = get();
+    const updatedProjects = state.researchProjects.map(project => {
+      if (project.status !== 'IN_PROGRESS') {
+        return project;
+      }
+
+      const research = getResearchById(project.researchId);
+      if (!research) {
+        return project;
+      }
+
+      // 일일 진행률 계산 (duration 일 동안 100% 완료)
+      const dailyProgress = 100 / research.duration;
+      const newProgress = Math.min(100, project.progress + dailyProgress);
+
+      // 완료 확인
+      if (newProgress >= 100) {
+        // 연구 효과 적용
+        const effects = research.effects;
+
+        // 도크 효율 증가
+        if (effects.dockEfficiency) {
+          const updatedDocks = state.docks.map(dock => ({
+            ...dock,
+            efficiency: Math.min(1, dock.efficiency + (effects.dockEfficiency || 0) / 100),
+          }));
+          set({ docks: updatedDocks });
+        }
+
+        // 평판 보너스
+        if (effects.reputationBonus) {
+          set({ reputation: Math.min(100, state.reputation + effects.reputationBonus) });
+        }
+
+        return {
+          ...project,
+          status: 'COMPLETED' as const,
+          progress: 100,
+          completionDate: new Date(state.currentDate),
+        };
+      }
+
+      return {
+        ...project,
+        progress: newProgress,
+      };
+    });
+
+    set({ researchProjects: updatedProjects });
   },
 }));
