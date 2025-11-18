@@ -10,6 +10,7 @@ import {
   DollarSign,
   Factory,
   FlaskConical,
+  Globe,
   Clock,
   Play,
   Pause,
@@ -44,6 +45,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/finance', label: '재무', icon: DollarSign },
     { path: '/production', label: '생산', icon: Factory },
     { path: '/research', label: '연구개발', icon: FlaskConical },
+    { path: '/market', label: '시장분석', icon: Globe },
   ];
 
   // 자동 시간 진행

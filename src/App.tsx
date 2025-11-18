@@ -6,6 +6,7 @@ import Sales from './components/sales/Sales';
 import Finance from './components/finance/Finance';
 import Production from './components/production/Production';
 import Research from './components/research/Research';
+import Market from './components/market/Market';
 import StartScreen from './components/StartScreen';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/finance" element={<Finance />} />
           <Route path="/production" element={<Production />} />
           <Route path="/research" element={<Research />} />
+          <Route path="/market" element={<Market />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

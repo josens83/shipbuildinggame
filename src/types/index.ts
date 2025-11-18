@@ -184,6 +184,9 @@ export interface GameState {
   // 연구 개발
   researchProjects: ResearchProject[];  // 진행 중/완료된 연구들
   activeResearchCount: number;          // 동시 진행 가능한 연구 수
+
+  // 경쟁사
+  competitors: Competitor[];            // 경쟁 조선소들
 }
 
 // 이벤트 타입
@@ -242,4 +245,31 @@ export interface ResearchProject {
   startDate?: Date;
   progress: number;            // 0-100
   completionDate?: Date;
+}
+
+// 경쟁사 타입
+export interface Competitor {
+  id: string;
+  name: string;
+  country: string;
+  founded: number;             // 설립 연도
+
+  // 역량
+  reputation: number;          // 0-100 평판
+  marketShare: number;         // 0-100 시장 점유율
+  technology: number;          // 0-100 기술력
+  financialStrength: number;   // 0-100 재무 건전성
+
+  // 생산 능력
+  totalDocks: number;
+  activeContracts: number;
+  shipsBuiltThisYear: number;
+
+  // AI 특성
+  aggressiveness: number;      // 0-1 공격성 (입찰 경쟁력)
+  rndFocus: number;            // 0-1 연구 집중도
+  expansionRate: number;       // 0-1 확장 속도
+
+  // 전문 분야
+  specialization: ShipType[];  // 주력 선종
 }

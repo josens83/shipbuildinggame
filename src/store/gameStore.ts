@@ -1,10 +1,12 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
+import { INITIAL_COMPETITORS } from '../data/competitors';
 import { BidGenerator } from '../engine/bidGenerator';
 import { SaveManager } from '../utils/saveManager';
 import { EventGenerator } from '../engine/eventGenerator';
 import { AVAILABLE_RESEARCH, getResearchById } from '../data/research';
+import { CompetitorAI } from '../engine/competitorAI';
 
 interface GameActions {
   // 게임 제어
@@ -59,6 +61,10 @@ interface GameActions {
   getAvailableResearch: () => Research[];
   getCompletedResearch: () => string[];
   canStartResearch: (researchId: string) => { canStart: boolean; reason?: string };
+
+  // 경쟁사
+  updateCompetitors: () => void;
+  getTopCompetitors: (limit?: number) => Competitor[];
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -155,6 +161,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   researchProjects: [],
   activeResearchCount: 1, // 초기에는 1개만 동시 연구 가능
 
+  // 경쟁사
+  competitors: [...INITIAL_COMPETITORS],
+
   // 액션들
   startGame: (companyName: string) => {
     set({ companyName });
@@ -205,9 +214,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     get().updateProduction();
     get().updateResearch(); // 연구 진행도 업데이트
 
-    // 월이 바뀌면 재무 업데이트
+    // 월이 바뀌면 재무 및 경쟁사 업데이트
     if (oldDate.getMonth() !== newDate.getMonth()) {
       get().updateFinancials();
+      get().updateCompetitors();
     }
 
     // 7일마다 새로운 입찰 생성 (입찰이 3개 미만일 때)
@@ -712,5 +722,31 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     });
 
     set({ researchProjects: updatedProjects });
+  },
+
+  // 경쟁사 액션들
+  updateCompetitors: () => {
+    const state = get();
+    const updatedCompetitors = state.competitors.map(competitor =>
+      CompetitorAI.updateCompetitorGrowth(competitor)
+    );
+
+    // 시장 점유율 정규화
+    const normalized = CompetitorAI.normalizeMarketShare(
+      updatedCompetitors,
+      state.marketShare
+    );
+
+    set({
+      competitors: normalized.competitors,
+      marketShare: normalized.playerMarketShare,
+    });
+  },
+
+  getTopCompetitors: (limit: number = 5) => {
+    const state = get();
+    return [...state.competitors]
+      .sort((a, b) => b.marketShare - a.marketShare)
+      .slice(0, limit);
   },
 }));
