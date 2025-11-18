@@ -190,6 +190,9 @@ export interface GameState {
 
   // 경쟁사
   competitors: Competitor[];            // 경쟁 조선소들
+
+  // 업적
+  achievements: AchievementProgress[];  // 업적 진행도
 }
 
 // 이벤트 타입
@@ -275,4 +278,48 @@ export interface Competitor {
 
   // 전문 분야
   specialization: ShipType[];  // 주력 선종
+}
+
+// 업적 타입
+export type AchievementCategory =
+  | 'MILESTONE'    // 이정표
+  | 'PRODUCTION'   // 생산
+  | 'FINANCIAL'    // 재무
+  | 'REPUTATION'   // 평판
+  | 'RESEARCH'     // 연구
+  | 'MARKET'       // 시장
+  | 'SPECIAL';     // 특수
+
+export type AchievementRarity =
+  | 'COMMON'       // 일반
+  | 'UNCOMMON'     // 희귀
+  | 'RARE'         // 레어
+  | 'EPIC'         // 에픽
+  | 'LEGENDARY';   // 전설
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  category: AchievementCategory;
+  rarity: AchievementRarity;
+
+  // 달성 조건
+  condition: (state: GameState) => boolean;
+
+  // 보상 (선택적)
+  reward?: {
+    cash?: number;
+    reputation?: number;
+    message?: string;
+  };
+
+  // 숨김 여부 (달성 전까지 ???로 표시)
+  hidden?: boolean;
+}
+
+export interface AchievementProgress {
+  achievementId: string;
+  unlocked: boolean;
+  unlockedAt?: Date;
 }

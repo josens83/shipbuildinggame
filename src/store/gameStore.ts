@@ -8,6 +8,7 @@ import { EventGenerator } from '../engine/eventGenerator';
 import { AVAILABLE_RESEARCH, getResearchById } from '../data/research';
 import { CompetitorAI } from '../engine/competitorAI';
 import { getDifficultySettings } from '../utils/difficultySettings';
+import { ALL_ACHIEVEMENTS, getAchievementById } from '../data/achievements';
 
 interface GameActions {
   // 게임 제어
@@ -66,6 +67,11 @@ interface GameActions {
   // 경쟁사
   updateCompetitors: () => void;
   getTopCompetitors: (limit?: number) => Competitor[];
+
+  // 업적
+  checkAchievements: () => void;
+  getUnlockedAchievements: () => string[];
+  getAchievementProgress: (achievementId: string) => import('../types').AchievementProgress | undefined;
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -166,6 +172,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // 경쟁사
   competitors: [...INITIAL_COMPETITORS],
 
+  // 업적
+  achievements: ALL_ACHIEVEMENTS.map(a => ({
+    achievementId: a.id,
+    unlocked: false,
+  })),
+
   // 액션들
   startGame: (companyName: string, difficulty: Difficulty = 'NORMAL') => {
     const settings = getDifficultySettings(difficulty);
@@ -210,6 +222,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     get().generateBids();
     // 자동 저장 시작 (1분마다)
     SaveManager.enableAutoSave(() => get(), 60000);
+    // 초기 업적 체크 (난이도 업적 등)
+    get().checkAchievements();
   },
 
   loadGame: () => {
@@ -272,6 +286,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         get().triggerEvent(randomEvent);
       }
     }
+
+    // 업적 체크
+    get().checkAchievements();
   },
 
   bidOnContract: (contractId: string, bidAmount: number) => {
@@ -787,5 +804,63 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     return [...state.competitors]
       .sort((a, b) => b.marketShare - a.marketShare)
       .slice(0, limit);
+  },
+
+  // 업적 액션들
+  checkAchievements: () => {
+    const state = get();
+    let hasNewAchievement = false;
+
+    const updatedAchievements = state.achievements.map(progress => {
+      if (progress.unlocked) return progress;
+
+      const achievement = getAchievementById(progress.achievementId);
+      if (!achievement) return progress;
+
+      // 조건 체크
+      if (achievement.condition(state)) {
+        hasNewAchievement = true;
+
+        // 보상 지급
+        if (achievement.reward) {
+          if (achievement.reward.cash) {
+            set({
+              financials: {
+                ...state.financials,
+                cash: state.financials.cash + achievement.reward.cash,
+              },
+            });
+          }
+          if (achievement.reward.reputation) {
+            set({
+              reputation: Math.min(100, state.reputation + achievement.reward.reputation),
+            });
+          }
+        }
+
+        // 언락
+        return {
+          ...progress,
+          unlocked: true,
+          unlockedAt: new Date(state.currentDate),
+        };
+      }
+
+      return progress;
+    });
+
+    if (hasNewAchievement) {
+      set({ achievements: updatedAchievements });
+    }
+  },
+
+  getUnlockedAchievements: () => {
+    const state = get();
+    return state.achievements.filter(a => a.unlocked).map(a => a.achievementId);
+  },
+
+  getAchievementProgress: (achievementId: string) => {
+    const state = get();
+    return state.achievements.find(a => a.achievementId === achievementId);
   },
 }));

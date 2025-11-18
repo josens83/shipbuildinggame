@@ -11,6 +11,7 @@ import {
   Factory,
   FlaskConical,
   Globe,
+  Award,
   Clock,
   Play,
   Pause,
@@ -46,6 +47,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/production', label: '생산', icon: Factory },
     { path: '/research', label: '연구개발', icon: FlaskConical },
     { path: '/market', label: '시장분석', icon: Globe },
+    { path: '/achievements', label: '업적', icon: Award },
   ];
 
   // 자동 시간 진행
