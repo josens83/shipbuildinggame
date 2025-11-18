@@ -12,6 +12,7 @@ import {
   FlaskConical,
   Globe,
   Award,
+  BarChart3,
   Clock,
   Play,
   Pause,
@@ -48,6 +49,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/research', label: '연구개발', icon: FlaskConical },
     { path: '/market', label: '시장분석', icon: Globe },
     { path: '/achievements', label: '업적', icon: Award },
+    { path: '/statistics', label: '통계', icon: BarChart3 },
   ];
 
   // 자동 시간 진행

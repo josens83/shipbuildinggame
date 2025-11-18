@@ -193,6 +193,44 @@ export interface GameState {
 
   // 업적
   achievements: AchievementProgress[];  // 업적 진행도
+
+  // 통계
+  statistics: MonthlyStatistics[];      // 월별 통계 데이터
+}
+
+// 월별 통계 타입
+export interface MonthlyStatistics {
+  year: number;
+  month: number;                        // 1-12
+  date: Date;
+
+  // 재무 통계
+  revenue: number;
+  netIncome: number;
+  cash: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  equity: number;
+
+  // 생산 통계
+  shipsCompleted: number;
+  shipsInProduction: number;
+  dockCount: number;
+  averageDockEfficiency: number;
+
+  // 인력 통계
+  totalWorkers: number;
+  averageSkillLevel: number;
+  averageMorale: number;
+
+  // 시장 통계
+  reputation: number;
+  marketShare: number;
+  activeContracts: number;
+
+  // 연구 통계
+  researchCompleted: number;
+  activeResearch: number;
 }
 
 // 이벤트 타입

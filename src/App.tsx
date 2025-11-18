@@ -8,6 +8,7 @@ import Production from './components/production/Production';
 import Research from './components/research/Research';
 import Market from './components/market/Market';
 import Achievements from './components/achievements/Achievements';
+import Statistics from './components/statistics/Statistics';
 import StartScreen from './components/StartScreen';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           <Route path="/research" element={<Research />} />
           <Route path="/market" element={<Market />} />
           <Route path="/achievements" element={<Achievements />} />
+          <Route path="/statistics" element={<Statistics />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

@@ -72,6 +72,10 @@ interface GameActions {
   checkAchievements: () => void;
   getUnlockedAchievements: () => string[];
   getAchievementProgress: (achievementId: string) => import('../types').AchievementProgress | undefined;
+
+  // 통계
+  recordMonthlyStatistics: () => void;
+  getStatisticsByPeriod: (months: number) => import('../types').MonthlyStatistics[];
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -178,6 +182,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     unlocked: false,
   })),
 
+  // 통계
+  statistics: [],
+
   // 액션들
   startGame: (companyName: string, difficulty: Difficulty = 'NORMAL') => {
     const settings = getDifficultySettings(difficulty);
@@ -271,6 +278,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (oldDate.getMonth() !== newDate.getMonth()) {
       get().updateFinancials();
       get().updateCompetitors();
+      get().recordMonthlyStatistics();
     }
 
     // 7일마다 새로운 입찰 생성 (입찰이 3개 미만일 때)
@@ -862,5 +870,79 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   getAchievementProgress: (achievementId: string) => {
     const state = get();
     return state.achievements.find(a => a.achievementId === achievementId);
+  },
+
+  // 통계 액션들
+  recordMonthlyStatistics: () => {
+    const state = get();
+    const currentDate = new Date(state.currentDate);
+
+    const totalWorkers =
+      state.workforce.welders +
+      state.workforce.fitters +
+      state.workforce.painters +
+      state.workforce.electricians +
+      state.workforce.engineers;
+
+    const avgDockEfficiency =
+      state.docks.length > 0
+        ? state.docks.reduce((sum, d) => sum + d.efficiency, 0) / state.docks.length
+        : 0;
+
+    const shipsInProduction = state.contracts.filter(
+      c => c.status === 'IN_PRODUCTION'
+    ).length;
+
+    const researchCompleted = state.researchProjects.filter(
+      p => p.status === 'COMPLETED'
+    ).length;
+
+    const activeResearch = state.researchProjects.filter(
+      p => p.status === 'IN_PROGRESS'
+    ).length;
+
+    const monthlyData: import('../types').MonthlyStatistics = {
+      year: currentDate.getFullYear(),
+      month: currentDate.getMonth() + 1,
+      date: new Date(currentDate),
+
+      // 재무
+      revenue: state.financials.revenue,
+      netIncome: state.financials.netIncome,
+      cash: state.financials.cash,
+      totalAssets: state.financials.totalAssets,
+      totalLiabilities: state.financials.totalLiabilities,
+      equity: state.financials.equity,
+
+      // 생산
+      shipsCompleted: state.totalShipsBuilt,
+      shipsInProduction,
+      dockCount: state.docks.length,
+      averageDockEfficiency: avgDockEfficiency,
+
+      // 인력
+      totalWorkers,
+      averageSkillLevel: state.workforce.skillLevel,
+      averageMorale: state.workforce.morale,
+
+      // 시장
+      reputation: state.reputation,
+      marketShare: state.marketShare,
+      activeContracts: state.contracts.filter(c => c.status !== 'CANCELLED' && c.status !== 'COMPLETED').length,
+
+      // 연구
+      researchCompleted,
+      activeResearch,
+    };
+
+    set({
+      statistics: [...state.statistics, monthlyData],
+    });
+  },
+
+  getStatisticsByPeriod: (months: number) => {
+    const state = get();
+    if (months <= 0) return state.statistics;
+    return state.statistics.slice(-months);
   },
 }));
