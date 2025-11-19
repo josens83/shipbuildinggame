@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { Settings as SettingsIcon, Save, Bell, Volume2, RotateCcw, HelpCircle, Trash2, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Bell, Volume2, RotateCcw, HelpCircle, Trash2, Database, Download, Upload, Keyboard } from 'lucide-react';
 import { SaveManager } from '../../utils/saveManager';
 import type { SaveSlotInfo } from '../../utils/saveManager';
 import { format } from 'date-fns';
+import { getShortcutDescriptions } from '../../hooks/useKeyboardShortcuts';
 
 export default function Settings() {
   const {
@@ -59,6 +60,81 @@ export default function Settings() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount * 1_000_000);
+  };
+
+  const handleExportData = () => {
+    try {
+      const allSlots = SaveManager.getAllSlots();
+      const exportData: Record<string, unknown> = {
+        version: '1.0.0',
+        exportDate: new Date().toISOString(),
+        slots: allSlots,
+        slotData: {} as Record<string, unknown>,
+      };
+
+      // 각 슬롯의 데이터도 내보내기
+      allSlots.forEach(slot => {
+        const slotData = SaveManager.loadFromSlot(slot.slotId);
+        if (slotData) {
+          (exportData.slotData as Record<string, unknown>)[`slot_${slot.slotId}`] = slotData;
+        }
+      });
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shipyard-tycoon-backup-${format(new Date(), 'yyyyMMdd-HHmmss')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('저장 데이터를 내보냈습니다.');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('데이터 내보내기에 실패했습니다.');
+    }
+  };
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importData = JSON.parse(content);
+
+        if (!importData.version || !importData.slotData) {
+          alert('유효하지 않은 백업 파일입니다.');
+          return;
+        }
+
+        if (!window.confirm('기존 저장 데이터를 덮어쓰시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+          return;
+        }
+
+        // 각 슬롯 데이터 가져오기
+        Object.entries(importData.slotData).forEach(([key, data]) => {
+          const slotId = parseInt(key.replace('slot_', ''));
+          if (!isNaN(slotId) && data) {
+            SaveManager.saveToSlot(data as Partial<import('../../types').GameState>, slotId);
+          }
+        });
+
+        refreshSlots();
+        alert('저장 데이터를 가져왔습니다. 시작 화면에서 불러오기를 선택하세요.');
+      } catch (error) {
+        console.error('Import failed:', error);
+        alert('데이터 가져오기에 실패했습니다. 파일 형식을 확인하세요.');
+      }
+    };
+
+    reader.readAsText(file);
+    // Reset the input
+    event.target.value = '';
   };
 
   const handleAutoSaveToggle = () => {
@@ -325,12 +401,74 @@ export default function Settings() {
             </div>
           </div>
         </div>
+
+        {/* 키보드 단축키 */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center gap-2 mb-4">
+            <Keyboard className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-lg font-semibold text-white">키보드 단축키</h2>
+          </div>
+
+          <div className="space-y-2">
+            {getShortcutDescriptions().map((shortcut) => (
+              <div key={shortcut.key} className="flex items-center justify-between py-1">
+                <span className="text-gray-300">{shortcut.description}</span>
+                <kbd className="px-2 py-1 bg-gray-700 text-gray-200 text-sm rounded border border-gray-600 font-mono">
+                  {shortcut.key}
+                </kbd>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 데이터 관리 */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="flex items-center gap-2 mb-4">
+          <Database className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-lg font-semibold text-white">데이터 관리</h2>
+        </div>
+
+        <div className="space-y-4">
+          {/* 데이터 내보내기 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white font-medium">데이터 내보내기</p>
+              <p className="text-sm text-gray-400">모든 저장 슬롯을 JSON 파일로 백업</p>
+            </div>
+            <button
+              onClick={handleExportData}
+              className="flex items-center gap-1 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              내보내기
+            </button>
+          </div>
+
+          {/* 데이터 가져오기 */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white font-medium">데이터 가져오기</p>
+              <p className="text-sm text-gray-400">백업 파일에서 저장 데이터 복원</p>
+            </div>
+            <label className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors cursor-pointer">
+              <Upload className="w-4 h-4" />
+              가져오기
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportData}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* 저장 슬롯 관리 */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <div className="flex items-center gap-2 mb-4">
-          <Database className="w-5 h-5 text-cyan-400" />
+          <Save className="w-5 h-5 text-green-400" />
           <h2 className="text-lg font-semibold text-white">저장 슬롯 관리</h2>
         </div>
 

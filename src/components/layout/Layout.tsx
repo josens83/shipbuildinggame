@@ -3,8 +3,10 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
 import EventNotification from '../common/EventNotification';
+import ToastContainer from '../common/Toast';
 import Tutorial from '../tutorial/Tutorial';
 import GameOver from '../GameOver';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import {
   Anchor,
   LayoutDashboard,
@@ -45,6 +47,9 @@ export default function Layout({ children }: LayoutProps) {
     handleEventChoice,
     startTutorial,
   } = useGameStore();
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
 
   const navItems = [
     { path: '/', label: '대시보드', icon: LayoutDashboard },
@@ -267,6 +272,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* 게임 종료 */}
       <GameOver />
+
+      {/* 토스트 알림 */}
+      <ToastContainer />
     </div>
   );
 }

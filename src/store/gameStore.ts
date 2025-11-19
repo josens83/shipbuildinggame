@@ -10,6 +10,7 @@ import { CompetitorAI } from '../engine/competitorAI';
 import { getDifficultySettings } from '../utils/difficultySettings';
 import { ALL_ACHIEVEMENTS, getAchievementById } from '../data/achievements';
 import { TUTORIAL_STEPS } from '../data/tutorial';
+import { useToastStore } from '../components/common/Toast';
 
 interface GameActions {
   // 게임 제어
@@ -886,7 +887,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // 업적 액션들
   checkAchievements: () => {
     const state = get();
-    let hasNewAchievement = false;
+    const newlyUnlocked: string[] = [];
 
     const updatedAchievements = state.achievements.map(progress => {
       if (progress.unlocked) return progress;
@@ -896,7 +897,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
       // 조건 체크
       if (achievement.condition(state)) {
-        hasNewAchievement = true;
+        newlyUnlocked.push(achievement.id);
 
         // 보상 지급
         if (achievement.reward) {
@@ -926,8 +927,35 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return progress;
     });
 
-    if (hasNewAchievement) {
+    if (newlyUnlocked.length > 0) {
       set({ achievements: updatedAchievements });
+
+      // 토스트 알림 표시
+      const { addToast } = useToastStore.getState();
+      newlyUnlocked.forEach(achievementId => {
+        const achievement = getAchievementById(achievementId);
+        if (achievement) {
+          let rewardText = '';
+          if (achievement.reward) {
+            const rewards = [];
+            if (achievement.reward.cash) {
+              rewards.push(`+$${(achievement.reward.cash / 1_000_000).toFixed(1)}M`);
+            }
+            if (achievement.reward.reputation) {
+              rewards.push(`+${achievement.reward.reputation} 평판`);
+            }
+            if (rewards.length > 0) {
+              rewardText = ` (${rewards.join(', ')})`;
+            }
+          }
+          addToast({
+            type: 'achievement',
+            title: `업적 달성: ${achievement.name}`,
+            message: achievement.description + rewardText,
+            duration: 5000,
+          });
+        }
+      });
     }
   },
 
