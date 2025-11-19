@@ -2,6 +2,8 @@ import type { GameState } from '../types';
 
 const STORAGE_KEY = 'shipyard-tycoon-save';
 
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
+
 export class SaveManager {
   /**
    * 게임 상태 저장
@@ -123,10 +125,15 @@ export class SaveManager {
   }
 
   /**
-   * 자동 저장
+   * 자동 저장 활성화
    */
   static enableAutoSave(getState: () => Partial<GameState>, interval: number = 60000): () => void {
-    const timer = setInterval(() => {
+    // 기존 타이머가 있으면 제거
+    if (autoSaveTimer) {
+      clearInterval(autoSaveTimer);
+    }
+
+    autoSaveTimer = setInterval(() => {
       const state = getState();
       if (state.companyName) { // 게임이 시작된 경우에만 저장
         SaveManager.saveGame(state);
@@ -134,6 +141,22 @@ export class SaveManager {
       }
     }, interval);
 
-    return () => clearInterval(timer);
+    return () => {
+      if (autoSaveTimer) {
+        clearInterval(autoSaveTimer);
+        autoSaveTimer = null;
+      }
+    };
+  }
+
+  /**
+   * 자동 저장 비활성화
+   */
+  static disableAutoSave(): void {
+    if (autoSaveTimer) {
+      clearInterval(autoSaveTimer);
+      autoSaveTimer = null;
+      console.log('Auto-save disabled');
+    }
   }
 }

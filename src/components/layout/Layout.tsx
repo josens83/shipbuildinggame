@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
 import EventNotification from '../common/EventNotification';
+import Tutorial from '../tutorial/Tutorial';
+import GameOver from '../GameOver';
 import {
   Anchor,
   LayoutDashboard,
@@ -18,6 +20,8 @@ import {
   Pause,
   FastForward,
   Save,
+  HelpCircle,
+  Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -39,6 +43,7 @@ export default function Layout({ children }: LayoutProps) {
     saveGame,
     closeEvent,
     handleEventChoice,
+    startTutorial,
   } = useGameStore();
 
   const navItems = [
@@ -50,6 +55,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/market', label: '시장분석', icon: Globe },
     { path: '/achievements', label: '업적', icon: Award },
     { path: '/statistics', label: '통계', icon: BarChart3 },
+    { path: '/settings', label: '설정', icon: Settings },
   ];
 
   // 자동 시간 진행
@@ -205,6 +211,15 @@ export default function Layout({ children }: LayoutProps) {
             {/* 빠른 정보 */}
             <div className="flex items-center space-x-6 text-sm">
               <button
+                onClick={startTutorial}
+                className="flex items-center space-x-1 px-3 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg transition-colors"
+                title="도움말"
+              >
+                <HelpCircle className="w-4 h-4 text-white" />
+                <span className="text-white text-xs font-semibold">도움말</span>
+              </button>
+
+              <button
                 onClick={handleSave}
                 className="flex items-center space-x-1 px-3 py-2 bg-green-700 hover:bg-green-600 rounded-lg transition-colors"
                 title="게임 저장"
@@ -246,6 +261,12 @@ export default function Layout({ children }: LayoutProps) {
           onChoice={handleEventChoice}
         />
       )}
+
+      {/* 튜토리얼 */}
+      <Tutorial />
+
+      {/* 게임 종료 */}
+      <GameOver />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty, TutorialProgress, GameSettings, GameEndState, GameEndReason } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
 import { INITIAL_COMPETITORS } from '../data/competitors';
 import { BidGenerator } from '../engine/bidGenerator';
@@ -9,6 +9,7 @@ import { AVAILABLE_RESEARCH, getResearchById } from '../data/research';
 import { CompetitorAI } from '../engine/competitorAI';
 import { getDifficultySettings } from '../utils/difficultySettings';
 import { ALL_ACHIEVEMENTS, getAchievementById } from '../data/achievements';
+import { TUTORIAL_STEPS } from '../data/tutorial';
 
 interface GameActions {
   // 게임 제어
@@ -76,6 +77,24 @@ interface GameActions {
   // 통계
   recordMonthlyStatistics: () => void;
   getStatisticsByPeriod: (months: number) => import('../types').MonthlyStatistics[];
+
+  // 튜토리얼
+  startTutorial: () => void;
+  nextTutorialStep: () => void;
+  prevTutorialStep: () => void;
+  skipTutorial: () => void;
+  completeTutorial: () => void;
+  resetTutorial: () => void;
+  getTutorialProgress: () => TutorialProgress;
+
+  // 설정
+  updateSettings: (settings: Partial<GameSettings>) => void;
+  resetSettings: () => void;
+  getSettings: () => GameSettings;
+
+  // 게임 종료
+  checkGameEnd: () => void;
+  resetGame: () => void;
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -185,6 +204,31 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // 통계
   statistics: [],
 
+  // 튜토리얼
+  tutorial: {
+    currentStep: 0,
+    completed: false,
+    skipped: false,
+    completedSteps: [],
+  } as TutorialProgress,
+  showTutorial: false,
+
+  // 설정
+  settings: {
+    autoSaveEnabled: true,
+    autoSaveInterval: 60000, // 1분
+    showEventNotifications: true,
+    showAchievementNotifications: true,
+    soundEnabled: false,
+    musicVolume: 50,
+    sfxVolume: 50,
+  } as GameSettings,
+
+  // 게임 종료
+  gameEnd: {
+    isEnded: false,
+  } as GameEndState,
+
   // 액션들
   startGame: (companyName: string, difficulty: Difficulty = 'NORMAL') => {
     const settings = getDifficultySettings(difficulty);
@@ -231,6 +275,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     SaveManager.enableAutoSave(() => get(), 60000);
     // 초기 업적 체크 (난이도 업적 등)
     get().checkAchievements();
+    // 새 게임 시작 시 튜토리얼 시작 (이전에 완료하거나 건너뛰지 않은 경우)
+    const tutorialState = get().tutorial;
+    if (!tutorialState.completed && !tutorialState.skipped) {
+      get().startTutorial();
+    }
   },
 
   loadGame: () => {
@@ -297,6 +346,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // 업적 체크
     get().checkAchievements();
+
+    // 게임 종료 조건 체크
+    get().checkGameEnd();
   },
 
   bidOnContract: (contractId: string, bidAmount: number) => {
@@ -944,5 +996,230 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const state = get();
     if (months <= 0) return state.statistics;
     return state.statistics.slice(-months);
+  },
+
+  // 튜토리얼 액션
+  startTutorial: () => {
+    set({
+      showTutorial: true,
+      tutorial: {
+        currentStep: 0,
+        completed: false,
+        skipped: false,
+        completedSteps: [],
+      },
+    });
+  },
+
+  nextTutorialStep: () => {
+    const state = get();
+    const currentStep = state.tutorial.currentStep;
+    const totalSteps = TUTORIAL_STEPS.length;
+
+    if (currentStep < totalSteps - 1) {
+      const currentStepId = TUTORIAL_STEPS[currentStep].id;
+      set({
+        tutorial: {
+          ...state.tutorial,
+          currentStep: currentStep + 1,
+          completedSteps: [...state.tutorial.completedSteps, currentStepId],
+        },
+      });
+    } else {
+      // 마지막 단계 완료
+      get().completeTutorial();
+    }
+  },
+
+  prevTutorialStep: () => {
+    const state = get();
+    const currentStep = state.tutorial.currentStep;
+
+    if (currentStep > 0) {
+      set({
+        tutorial: {
+          ...state.tutorial,
+          currentStep: currentStep - 1,
+        },
+      });
+    }
+  },
+
+  skipTutorial: () => {
+    set({
+      showTutorial: false,
+      tutorial: {
+        currentStep: 0,
+        completed: false,
+        skipped: true,
+        completedSteps: [],
+      },
+    });
+  },
+
+  completeTutorial: () => {
+    const state = get();
+    const allStepIds = TUTORIAL_STEPS.map(s => s.id);
+    set({
+      showTutorial: false,
+      tutorial: {
+        ...state.tutorial,
+        completed: true,
+        completedSteps: allStepIds,
+      },
+    });
+  },
+
+  resetTutorial: () => {
+    set({
+      tutorial: {
+        currentStep: 0,
+        completed: false,
+        skipped: false,
+        completedSteps: [],
+      },
+    });
+  },
+
+  getTutorialProgress: () => {
+    return get().tutorial;
+  },
+
+  // 설정 액션
+  updateSettings: (newSettings: Partial<GameSettings>) => {
+    const state = get();
+    const updatedSettings = { ...state.settings, ...newSettings };
+
+    // 자동 저장 설정 변경 시 타이머 업데이트
+    if (newSettings.autoSaveEnabled !== undefined || newSettings.autoSaveInterval !== undefined) {
+      if (updatedSettings.autoSaveEnabled) {
+        SaveManager.enableAutoSave(() => get(), updatedSettings.autoSaveInterval);
+      } else {
+        SaveManager.disableAutoSave();
+      }
+    }
+
+    set({ settings: updatedSettings });
+  },
+
+  resetSettings: () => {
+    const defaultSettings: GameSettings = {
+      autoSaveEnabled: true,
+      autoSaveInterval: 60000,
+      showEventNotifications: true,
+      showAchievementNotifications: true,
+      soundEnabled: false,
+      musicVolume: 50,
+      sfxVolume: 50,
+    };
+    set({ settings: defaultSettings });
+  },
+
+  getSettings: () => {
+    return get().settings;
+  },
+
+  // 게임 종료 체크
+  checkGameEnd: () => {
+    const state = get();
+
+    // 이미 종료된 경우 체크하지 않음
+    if (state.gameEnd.isEnded) return;
+
+    let reason: GameEndReason | undefined;
+
+    // 승리 조건 체크
+    if (state.reputation >= 95 && state.totalShipsBuilt >= 50) {
+      reason = 'VICTORY_REPUTATION';
+    } else if (state.marketShare >= 40) {
+      reason = 'VICTORY_MARKET_SHARE';
+    } else if (state.totalShipsBuilt >= 100) {
+      reason = 'VICTORY_SHIPS_BUILT';
+    } else if (state.financials.totalAssets >= 500_000_000 && state.financials.longTermDebt < 50_000_000) {
+      reason = 'VICTORY_WEALTH';
+    }
+
+    // 파산 조건 체크
+    if (!reason) {
+      if (state.financials.cash < 0 && state.financials.longTermDebt >= state.creditLine) {
+        reason = 'BANKRUPTCY_CASH';
+      } else if (state.financials.debtToEquityRatio > 5) {
+        reason = 'BANKRUPTCY_DEBT';
+      } else if (state.reputation <= 5) {
+        reason = 'BANKRUPTCY_REPUTATION';
+      }
+    }
+
+    if (reason) {
+      const startDate = new Date(2025, 0, 1);
+      const playTime = Math.floor((state.currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      set({
+        gameEnd: {
+          isEnded: true,
+          reason,
+          endDate: new Date(state.currentDate),
+          finalStats: {
+            totalShipsBuilt: state.totalShipsBuilt,
+            totalRevenue: state.totalRevenue,
+            finalCash: state.financials.cash,
+            finalReputation: state.reputation,
+            finalMarketShare: state.marketShare,
+            playTime,
+          },
+        },
+      });
+    }
+  },
+
+  resetGame: () => {
+    // 전체 게임 상태 초기화
+    set({
+      companyName: '',
+      difficulty: 'NORMAL' as Difficulty,
+      currentDate: new Date(2025, 0, 1),
+      gameSpeed: 1,
+      financials: INITIAL_FINANCIALS,
+      creditLine: 100_000_000,
+      creditUsed: 0,
+      docks: INITIAL_DOCKS,
+      workforce: {
+        welders: 100,
+        fitters: 80,
+        painters: 60,
+        electricians: 40,
+        engineers: 50,
+        morale: 70,
+        skillLevel: 60,
+        monthlyCost: 3.0,
+      },
+      contracts: [],
+      customers: [...INITIAL_CUSTOMERS],
+      availableBids: [],
+      totalShipsBuilt: 0,
+      totalRevenue: 0,
+      reputation: 50,
+      marketShare: 5,
+      events: [],
+      activeEvent: null,
+      researchProjects: [],
+      activeResearchCount: 1,
+      competitors: [...INITIAL_COMPETITORS],
+      achievements: ALL_ACHIEVEMENTS.map(a => ({
+        achievementId: a.id,
+        unlocked: false,
+      })),
+      statistics: [],
+      tutorial: {
+        currentStep: 0,
+        completed: false,
+        skipped: false,
+        completedSteps: [],
+      },
+      showTutorial: false,
+      gameEnd: {
+        isEnded: false,
+      },
+    });
   },
 }));

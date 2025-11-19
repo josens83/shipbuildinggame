@@ -196,6 +196,16 @@ export interface GameState {
 
   // 통계
   statistics: MonthlyStatistics[];      // 월별 통계 데이터
+
+  // 튜토리얼
+  tutorial: TutorialProgress;
+  showTutorial: boolean;
+
+  // 설정
+  settings: GameSettings;
+
+  // 게임 종료
+  gameEnd: GameEndState;
 }
 
 // 월별 통계 타입
@@ -360,4 +370,74 @@ export interface AchievementProgress {
   achievementId: string;
   unlocked: boolean;
   unlockedAt?: Date;
+}
+
+// 튜토리얼 타입
+export type TutorialStepId =
+  | 'WELCOME'           // 환영 인사
+  | 'DASHBOARD'         // 대시보드 소개
+  | 'TIME_CONTROL'      // 시간 조절
+  | 'SALES'             // 영업 시스템
+  | 'BIDDING'           // 입찰 방법
+  | 'CONTRACTS'         // 계약 관리
+  | 'FINANCE'           // 재무 관리
+  | 'LOANS'             // 대출 시스템
+  | 'PRODUCTION'        // 생산 관리
+  | 'DOCK_ASSIGNMENT'   // 도크 배정
+  | 'WORKERS'           // 인력 관리
+  | 'RESEARCH'          // 연구 개발
+  | 'MARKET'            // 시장 분석
+  | 'ACHIEVEMENTS'      // 업적
+  | 'STATISTICS'        // 통계
+  | 'COMPLETE';         // 완료
+
+export interface TutorialStep {
+  id: TutorialStepId;
+  title: string;
+  content: string;
+  target?: string;         // 강조할 UI 요소 (선택적)
+  action?: string;         // 사용자가 해야 할 동작
+  nextCondition?: () => boolean;  // 다음 단계로 넘어가는 조건
+}
+
+export interface TutorialProgress {
+  currentStep: number;
+  completed: boolean;
+  skipped: boolean;
+  completedSteps: TutorialStepId[];
+}
+
+// 게임 설정 타입
+export interface GameSettings {
+  autoSaveEnabled: boolean;
+  autoSaveInterval: number;     // 밀리초
+  showEventNotifications: boolean;
+  showAchievementNotifications: boolean;
+  soundEnabled: boolean;
+  musicVolume: number;          // 0-100
+  sfxVolume: number;            // 0-100
+}
+
+// 게임 종료 타입
+export type GameEndReason =
+  | 'VICTORY_REPUTATION'     // 평판 승리
+  | 'VICTORY_MARKET_SHARE'   // 시장 점유율 승리
+  | 'VICTORY_SHIPS_BUILT'    // 건조 선박 수 승리
+  | 'VICTORY_WEALTH'         // 자산 승리
+  | 'BANKRUPTCY_CASH'        // 현금 부족 파산
+  | 'BANKRUPTCY_DEBT'        // 과도한 부채 파산
+  | 'BANKRUPTCY_REPUTATION'; // 평판 하락 파산
+
+export interface GameEndState {
+  isEnded: boolean;
+  reason?: GameEndReason;
+  endDate?: Date;
+  finalStats?: {
+    totalShipsBuilt: number;
+    totalRevenue: number;
+    finalCash: number;
+    finalReputation: number;
+    finalMarketShare: number;
+    playTime: number;  // 플레이 일수
+  };
 }
