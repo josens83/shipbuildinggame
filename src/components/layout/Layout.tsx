@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
 import EventNotification from '../common/EventNotification';
 import ToastContainer from '../common/Toast';
+import ConfirmDialog from '../common/ConfirmDialog';
 import Tutorial from '../tutorial/Tutorial';
 import GameOver from '../GameOver';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -275,6 +276,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* 토스트 알림 */}
       <ToastContainer />
+
+      {/* 확인 다이얼로그 */}
+      <ConfirmDialog />
     </div>
   );
 }
