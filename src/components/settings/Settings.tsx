@@ -1,5 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { Settings as SettingsIcon, Save, Bell, Volume2, RotateCcw, HelpCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Bell, Volume2, RotateCcw, HelpCircle, Trash2, Database } from 'lucide-react';
+import { SaveManager } from '../../utils/saveManager';
+import type { SaveSlotInfo } from '../../utils/saveManager';
+import { format } from 'date-fns';
 
 export default function Settings() {
   const {
@@ -8,7 +12,54 @@ export default function Settings() {
     resetSettings,
     resetTutorial,
     startTutorial,
+    saveToSlot,
   } = useGameStore();
+
+  const [slots, setSlots] = useState<SaveSlotInfo[]>([]);
+  const [savingSlot, setSavingSlot] = useState<number | null>(null);
+
+  useEffect(() => {
+    refreshSlots();
+  }, []);
+
+  const refreshSlots = () => {
+    const savedSlots = SaveManager.getAllSlots();
+    setSlots(savedSlots.sort((a, b) => a.slotId - b.slotId));
+  };
+
+  const handleSaveToSlot = (slotId: number) => {
+    setSavingSlot(slotId);
+    const success = saveToSlot(slotId);
+    setTimeout(() => {
+      setSavingSlot(null);
+      if (success) {
+        refreshSlots();
+        alert(`슬롯 ${slotId + 1}에 저장되었습니다.`);
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    }, 500);
+  };
+
+  const handleDeleteSlot = (slotId: number) => {
+    if (window.confirm(`슬롯 ${slotId + 1}의 저장 데이터를 삭제하시겠습니까?`)) {
+      SaveManager.deleteSlot(slotId);
+      refreshSlots();
+    }
+  };
+
+  const getSlotInfo = (slotId: number): SaveSlotInfo | undefined => {
+    return slots.find(s => s.slotId === slotId);
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount * 1_000_000);
+  };
 
   const handleAutoSaveToggle = () => {
     updateSettings({ autoSaveEnabled: !settings.autoSaveEnabled });
@@ -273,6 +324,76 @@ export default function Settings() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 저장 슬롯 관리 */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="flex items-center gap-2 mb-4">
+          <Database className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-lg font-semibold text-white">저장 슬롯 관리</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {Array.from({ length: SaveManager.getMaxSlots() }, (_, i) => i).map((slotId) => {
+            const slotInfo = getSlotInfo(slotId);
+            const isSaving = savingSlot === slotId;
+
+            return (
+              <div
+                key={slotId}
+                className={`p-3 rounded-lg border transition-all ${
+                  slotInfo
+                    ? 'border-cyan-700 bg-cyan-900/20'
+                    : 'border-gray-700 bg-gray-700/30'
+                }`}
+              >
+                <div className="text-center mb-2">
+                  <span className="text-xs font-semibold text-gray-400">슬롯 {slotId + 1}</span>
+                </div>
+
+                {slotInfo ? (
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-white truncate" title={slotInfo.companyName}>
+                      {slotInfo.companyName}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {format(new Date(slotInfo.currentDate), 'yy.MM.dd')}
+                    </p>
+                    <p className="text-xs text-green-400">
+                      {formatCurrency(slotInfo.cash)}
+                    </p>
+                    <div className="flex gap-1 mt-2">
+                      <button
+                        onClick={() => handleSaveToSlot(slotId)}
+                        disabled={isSaving}
+                        className="flex-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors disabled:opacity-50"
+                      >
+                        {isSaving ? '...' : '덮어쓰기'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSlot(slotId)}
+                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 mb-2">비어있음</p>
+                    <button
+                      onClick={() => handleSaveToSlot(slotId)}
+                      disabled={isSaving}
+                      className="w-full px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors disabled:opacity-50"
+                    >
+                      {isSaving ? '저장 중...' : '저장하기'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

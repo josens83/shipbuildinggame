@@ -15,7 +15,9 @@ interface GameActions {
   // 게임 제어
   startGame: (companyName: string, difficulty?: import('../types').Difficulty) => void;
   loadGame: () => boolean;
+  loadFromSlot: (slotId: number) => boolean;
   saveGame: () => boolean;
+  saveToSlot: (slotId: number) => boolean;
   pauseGame: () => void;
   advanceTime: (days: number) => void;
   setGameSpeed: (speed: 1 | 2 | 3) => void;
@@ -293,8 +295,23 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     return false;
   },
 
+  loadFromSlot: (slotId: number) => {
+    const savedData = SaveManager.loadFromSlot(slotId);
+    if (savedData) {
+      set(savedData as Partial<GameState & GameActions>);
+      // 자동 저장 재시작
+      SaveManager.enableAutoSave(() => get(), 60000);
+      return true;
+    }
+    return false;
+  },
+
   saveGame: () => {
     return SaveManager.saveGame(get());
+  },
+
+  saveToSlot: (slotId: number) => {
+    return SaveManager.saveToSlot(get(), slotId);
   },
 
   pauseGame: () => {
