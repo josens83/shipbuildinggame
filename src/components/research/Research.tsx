@@ -16,6 +16,7 @@ import {
   Award,
   Bot,
 } from 'lucide-react';
+import { useDialog } from '../common/ConfirmDialog';
 
 const CATEGORY_ICONS: Record<ResearchCategory, any> = {
   PRODUCTION: TrendingUp,
@@ -53,6 +54,8 @@ export default function Research() {
     canStartResearch,
   } = useGameStore();
 
+  const { warning } = useDialog();
+
   const [selectedCategory, setSelectedCategory] = useState<ResearchCategory | 'ALL'>('ALL');
   const [selectedResearch, setSelectedResearch] = useState<string | null>(null);
 
@@ -68,10 +71,10 @@ export default function Research() {
     return `$${amount}M`;
   };
 
-  const handleStartResearch = (researchId: string) => {
+  const handleStartResearch = async (researchId: string) => {
     const result = canStartResearch(researchId);
     if (!result.canStart) {
-      alert(result.reason);
+      await warning('연구 시작 불가', result.reason || '연구를 시작할 수 없습니다.');
       return;
     }
 

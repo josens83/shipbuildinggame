@@ -11,6 +11,7 @@ import {
   getDifficultySettings,
 } from '../utils/difficultySettings';
 import { format } from 'date-fns';
+import { useDialog } from './common/ConfirmDialog';
 
 export default function StartScreen() {
   const [companyName, setCompanyName] = useState('');
@@ -21,6 +22,7 @@ export default function StartScreen() {
 
   const startGame = useGameStore((state) => state.startGame);
   const loadFromSlot = useGameStore((state) => state.loadFromSlot);
+  const { alert: alertDialog, confirm } = useDialog();
 
   useEffect(() => {
     refreshSlots();
@@ -41,16 +43,17 @@ export default function StartScreen() {
     }
   };
 
-  const handleLoadSlot = (slotId: number) => {
+  const handleLoadSlot = async (slotId: number) => {
     const success = loadFromSlot(slotId);
     if (!success) {
-      alert('저장된 게임을 불러오는데 실패했습니다.');
+      await alertDialog('불러오기 실패', '저장된 게임을 불러오는데 실패했습니다.');
     }
   };
 
-  const handleDeleteSlot = (slotId: number, e: React.MouseEvent) => {
+  const handleDeleteSlot = async (slotId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('이 저장 데이터를 삭제하시겠습니까?')) {
+    const confirmed = await confirm('저장 데이터 삭제', '이 저장 데이터를 삭제하시겠습니까?');
+    if (confirmed) {
       SaveManager.deleteSlot(slotId);
       refreshSlots();
       setSelectedSlot(null);

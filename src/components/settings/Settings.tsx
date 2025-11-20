@@ -5,6 +5,7 @@ import { SaveManager } from '../../utils/saveManager';
 import type { SaveSlotInfo } from '../../utils/saveManager';
 import { format } from 'date-fns';
 import { getShortcutDescriptions } from '../../hooks/useKeyboardShortcuts';
+import { useDialog } from '../common/ConfirmDialog';
 
 export default function Settings() {
   const {
@@ -15,6 +16,8 @@ export default function Settings() {
     startTutorial,
     saveToSlot,
   } = useGameStore();
+
+  const { success: successDialog, alert: alertDialog, confirm } = useDialog();
 
   const [slots, setSlots] = useState<SaveSlotInfo[]>([]);
   const [savingSlot, setSavingSlot] = useState<number | null>(null);
@@ -28,22 +31,23 @@ export default function Settings() {
     setSlots(savedSlots.sort((a, b) => a.slotId - b.slotId));
   };
 
-  const handleSaveToSlot = (slotId: number) => {
+  const handleSaveToSlot = async (slotId: number) => {
     setSavingSlot(slotId);
     const success = saveToSlot(slotId);
-    setTimeout(() => {
+    setTimeout(async () => {
       setSavingSlot(null);
       if (success) {
         refreshSlots();
-        alert(`슬롯 ${slotId + 1}에 저장되었습니다.`);
+        await successDialog('저장 완료', `슬롯 ${slotId + 1}에 저장되었습니다.`);
       } else {
-        alert('저장에 실패했습니다.');
+        await alertDialog('저장 실패', '저장에 실패했습니다.');
       }
     }, 500);
   };
 
-  const handleDeleteSlot = (slotId: number) => {
-    if (window.confirm(`슬롯 ${slotId + 1}의 저장 데이터를 삭제하시겠습니까?`)) {
+  const handleDeleteSlot = async (slotId: number) => {
+    const confirmed = await confirm('슬롯 삭제', `슬롯 ${slotId + 1}의 저장 데이터를 삭제하시겠습니까?`);
+    if (confirmed) {
       SaveManager.deleteSlot(slotId);
       refreshSlots();
     }
@@ -62,7 +66,7 @@ export default function Settings() {
     }).format(amount * 1_000_000);
   };
 
-  const handleExportData = () => {
+  const handleExportData = async () => {
     try {
       const allSlots = SaveManager.getAllSlots();
       const exportData: Record<string, unknown> = {
@@ -90,10 +94,10 @@ export default function Settings() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('저장 데이터를 내보냈습니다.');
+      await successDialog('내보내기 완료', '저장 데이터를 내보냈습니다.');
     } catch (error) {
       console.error('Export failed:', error);
-      alert('데이터 내보내기에 실패했습니다.');
+      await alertDialog('내보내기 실패', '데이터 내보내기에 실패했습니다.');
     }
   };
 
@@ -102,17 +106,21 @@ export default function Settings() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const importData = JSON.parse(content);
 
         if (!importData.version || !importData.slotData) {
-          alert('유효하지 않은 백업 파일입니다.');
+          await alertDialog('오류', '유효하지 않은 백업 파일입니다.');
           return;
         }
 
-        if (!window.confirm('기존 저장 데이터를 덮어쓰시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        const confirmed = await confirm(
+          '데이터 가져오기',
+          '기존 저장 데이터를 덮어쓰시겠습니까?\n이 작업은 되돌릴 수 없습니다.'
+        );
+        if (!confirmed) {
           return;
         }
 
@@ -125,10 +133,10 @@ export default function Settings() {
         });
 
         refreshSlots();
-        alert('저장 데이터를 가져왔습니다. 시작 화면에서 불러오기를 선택하세요.');
+        await successDialog('가져오기 완료', '저장 데이터를 가져왔습니다.\n시작 화면에서 불러오기를 선택하세요.');
       } catch (error) {
         console.error('Import failed:', error);
-        alert('데이터 가져오기에 실패했습니다. 파일 형식을 확인하세요.');
+        await alertDialog('가져오기 실패', '데이터 가져오기에 실패했습니다.\n파일 형식을 확인하세요.');
       }
     };
 
@@ -170,8 +178,9 @@ export default function Settings() {
     startTutorial();
   };
 
-  const handleResetSettings = () => {
-    if (window.confirm('설정을 초기화하시겠습니까?')) {
+  const handleResetSettings = async () => {
+    const confirmed = await confirm('설정 초기화', '설정을 초기화하시겠습니까?');
+    if (confirmed) {
       resetSettings();
     }
   };

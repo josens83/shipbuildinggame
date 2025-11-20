@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
 import EventNotification from '../common/EventNotification';
 import ToastContainer from '../common/Toast';
-import ConfirmDialog from '../common/ConfirmDialog';
+import ConfirmDialog, { useDialog } from '../common/ConfirmDialog';
 import Tutorial from '../tutorial/Tutorial';
 import GameOver from '../GameOver';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -52,6 +52,9 @@ export default function Layout({ children }: LayoutProps) {
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
 
+  // Dialog hook
+  const { success: successDialog, alert: alertDialog } = useDialog();
+
   const navItems = [
     { path: '/', label: '대시보드', icon: LayoutDashboard },
     { path: '/sales', label: '영업', icon: Briefcase },
@@ -86,12 +89,12 @@ export default function Layout({ children }: LayoutProps) {
     setGameSpeed(nextSpeed);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const success = saveGame();
     if (success) {
-      alert('게임이 저장되었습니다!');
+      await successDialog('저장 완료', '게임이 저장되었습니다!');
     } else {
-      alert('저장에 실패했습니다.');
+      await alertDialog('저장 실패', '저장에 실패했습니다.');
     }
   };
 
