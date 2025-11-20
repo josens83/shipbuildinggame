@@ -226,6 +226,10 @@ src/
 - [x] 토스트 알림 시스템 (업적 달성 알림)
 - [x] 데이터 내보내기/가져오기 (JSON 백업)
 - [x] 키보드 단축키 (Space/1/2/3/Ctrl+S)
+- [x] 에러 바운더리 (React Error Boundary)
+- [x] 확인 다이얼로그 시스템 (모달 기반, alert/confirm 대체)
+- [x] PWA 지원 (Service Worker, Manifest, 오프라인 실행)
+- [x] 코드 스플리팅 & 로딩 최적화 (66% 번들 사이즈 감소)
 - [ ] 클라우드 저장 (Firebase)
 - [ ] 멀티플레이어 모드
 
