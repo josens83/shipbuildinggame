@@ -25,6 +25,7 @@ export default function StartScreen() {
   const { alert: alertDialog, confirm } = useDialog();
 
   useEffect(() => {
+    console.log('[StartScreen] Component mounted');
     refreshSlots();
   }, []);
 
@@ -38,8 +39,17 @@ export default function StartScreen() {
 
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[StartScreen] handleStart called', { companyName, difficulty });
     if (companyName.trim()) {
-      startGame(companyName.trim(), difficulty);
+      console.log('[StartScreen] Starting game...');
+      try {
+        startGame(companyName.trim(), difficulty);
+        console.log('[StartScreen] startGame completed');
+      } catch (error) {
+        console.error('[StartScreen] Error in startGame:', error);
+      }
+    } else {
+      console.log('[StartScreen] companyName is empty');
     }
   };
 
