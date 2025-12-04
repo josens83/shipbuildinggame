@@ -58,6 +58,9 @@ export interface Customer {
   defaultRisk: number;   // 0-1 (부도 위험)
 }
 
+// 입찰 결과 타입
+export type BidResult = 'WON' | 'LOST' | 'EXPIRED' | 'PENDING';
+
 export interface Contract {
   id: string;
   customerId: string;
@@ -74,6 +77,13 @@ export interface Contract {
   contractDate?: Date;
   deliveryDate?: Date;
   penaltyPerDay: number;      // 지연 페널티 (일당)
+
+  // 입찰 관련
+  bidDeadline?: Date;         // 입찰 마감일
+  bidResult?: BidResult;      // 입찰 결과
+  bidAmount?: number;         // 입찰 금액
+  usedBroker?: boolean;       // 브로커 사용 여부
+  brokerCommission?: number;  // 브로커 수수료율 (%)
 
   // 생산 관련
   assignedDockId?: string;
@@ -152,6 +162,29 @@ export interface FinancialStatement {
   returnOnEquity: number;     // ROE
 }
 
+// 회사채 (Corporate Bond)
+export interface CorporateBond {
+  id: string;
+  issueDate: Date;            // 발행일
+  maturityDate: Date;         // 만기일
+  principal: number;          // 원금 (백만 달러)
+  interestRate: number;       // 연이율 (0-1)
+  paymentFrequency: 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL'; // 이자 지급 주기
+  isActive: boolean;          // 활성 상태
+  totalInterestPaid: number;  // 지급한 총 이자
+}
+
+// 주식 발행 (Stock Issuance)
+export interface StockIssuance {
+  id: string;
+  issueDate: Date;            // 발행일
+  sharesIssued: number;       // 발행 주식 수
+  pricePerShare: number;      // 주당 발행가
+  totalRaised: number;        // 조달 금액 (백만 달러)
+  type: 'IPO' | 'RIGHTS_OFFERING' | 'PRIVATE_PLACEMENT'; // 유상증자 유형
+  dilutionEffect: number;     // 지분 희석률 (0-1)
+}
+
 export type Difficulty = 'EASY' | 'NORMAL' | 'HARD' | 'EXPERT';
 
 export interface GameState {
@@ -165,6 +198,10 @@ export interface GameState {
   financials: FinancialStatement;
   creditLine: number;         // 신용한도
   creditUsed: number;         // 사용 중인 신용
+  corporateBonds: CorporateBond[];   // 발행된 회사채
+  stockIssuances: StockIssuance[];   // 주식 발행 이력
+  totalShares: number;               // 총 발행 주식 수
+  sharePrice: number;                // 현재 주가 (추정)
 
   // 자원
   docks: Dock[];

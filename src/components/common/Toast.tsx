@@ -1,9 +1,9 @@
 import { useEffect, useCallback } from 'react';
 import { create } from 'zustand';
-import { CheckCircle, AlertCircle, Info, Award, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, Award, AlertTriangle, X } from 'lucide-react';
 
 // Toast 타입 정의
-export type ToastType = 'success' | 'error' | 'info' | 'achievement';
+export type ToastType = 'success' | 'error' | 'info' | 'warning' | 'achievement';
 
 export interface Toast {
   id: string;
@@ -78,6 +78,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
     success: <CheckCircle className="w-5 h-5 text-green-400" />,
     error: <AlertCircle className="w-5 h-5 text-red-400" />,
     info: <Info className="w-5 h-5 text-blue-400" />,
+    warning: <AlertTriangle className="w-5 h-5 text-orange-400" />,
     achievement: <Award className="w-5 h-5 text-yellow-400" />,
   };
 
@@ -85,6 +86,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
     success: 'bg-green-900/90 border-green-700',
     error: 'bg-red-900/90 border-red-700',
     info: 'bg-blue-900/90 border-blue-700',
+    warning: 'bg-orange-900/90 border-orange-700',
     achievement: 'bg-yellow-900/90 border-yellow-700',
   };
 
