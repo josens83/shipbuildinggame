@@ -19,13 +19,13 @@ export default function StartScreen() {
   const [activeTab, setActiveTab] = useState<'load' | 'new'>('new');
   const [slots, setSlots] = useState<SaveSlotInfo[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [showNameError, setShowNameError] = useState(false);
 
   const startGame = useGameStore((state) => state.startGame);
   const loadFromSlot = useGameStore((state) => state.loadFromSlot);
   const { alert: alertDialog, confirm } = useDialog();
 
   useEffect(() => {
-    console.log('[StartScreen] Component mounted');
     refreshSlots();
   }, []);
 
@@ -37,19 +37,21 @@ export default function StartScreen() {
     }
   };
 
-  const handleStart = (e: React.FormEvent) => {
+  const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[StartScreen] handleStart called', { companyName, difficulty });
-    if (companyName.trim()) {
-      console.log('[StartScreen] Starting game...');
-      try {
-        startGame(companyName.trim(), difficulty);
-        console.log('[StartScreen] startGame completed');
-      } catch (error) {
-        console.error('[StartScreen] Error in startGame:', error);
-      }
-    } else {
-      console.log('[StartScreen] companyName is empty');
+    if (!companyName.trim()) {
+      setShowNameError(true);
+      await alertDialog('회사 이름 필요', '회사 이름을 입력해주세요.');
+      return;
+    }
+    setShowNameError(false);
+    startGame(companyName.trim(), difficulty);
+  };
+
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCompanyName(e.target.value);
+    if (e.target.value.trim()) {
+      setShowNameError(false);
     }
   };
 
@@ -225,12 +227,14 @@ export default function StartScreen() {
                   id="companyName"
                   type="text"
                   value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="input-field w-full text-lg"
+                  onChange={handleCompanyNameChange}
+                  className={`input-field w-full text-lg ${showNameError ? 'border-red-500 focus:ring-red-500' : ''}`}
                   placeholder="당신의 조선소 이름을 입력하세요"
                   maxLength={50}
-                  required
                 />
+                {showNameError && (
+                  <p className="mt-2 text-sm text-red-400">회사 이름을 입력해주세요.</p>
+                )}
               </div>
 
               {/* 난이도 선택 */}
@@ -287,7 +291,6 @@ export default function StartScreen() {
               <button
                 type="submit"
                 className="btn-primary w-full text-lg py-3"
-                disabled={!companyName.trim()}
               >
                 게임 시작
               </button>
