@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty, TutorialProgress, GameSettings, GameEndState, GameEndReason, AnnualPlan, PlanScenario, AnnualTarget, AnnualActual, ShipType } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty, TutorialProgress, GameSettings, GameEndState, GameEndReason, AnnualPlan, PlanScenario, AnnualTarget, AnnualActual, ShipType, CorporateBond, StockIssuance, BidResult } from '../types';
 import { SCENARIO_PRESETS } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
 import { INITIAL_COMPETITORS } from '../data/competitors';
@@ -26,7 +26,7 @@ interface GameActions {
 
   // 영업
   generateBids: () => void;
-  bidOnContract: (contractId: string, bidAmount: number) => void;
+  bidOnContract: (contractId: string, bidAmount: number, useBroker?: boolean, brokerCommission?: number) => void;
   signContract: (contractId: string) => void;
   cancelContract: (contractId: string) => void;
 
@@ -111,6 +111,17 @@ interface GameActions {
   updatePlanActuals: () => void;
   openAnnualPlanDialog: (year: number) => void;
   closeAnnualPlanDialog: () => void;
+
+  // 입찰 시스템
+  processBidResults: () => void;
+  checkBidExpirations: () => void;
+
+  // 재무 확장 (회사채, 유상증자)
+  issueCorporateBond: (principal: number, interestRate: number, years: number, frequency: 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL') => boolean;
+  repayCorporateBond: (bondId: string) => boolean;
+  issueStock: (shares: number, pricePerShare: number, type: 'RIGHTS_OFFERING' | 'PRIVATE_PLACEMENT') => boolean;
+  processBondInterest: () => void;
+  updateSharePrice: () => void;
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -178,6 +189,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   financials: INITIAL_FINANCIALS,
   creditLine: 100_000_000, // 신용한도 1억 달러
   creditUsed: 0,
+  corporateBonds: [],
+  stockIssuances: [],
+  totalShares: 1_000_000, // 초기 발행 주식 수 (100만주)
+  sharePrice: 100, // 초기 주가 $100
 
   docks: INITIAL_DOCKS,
   workforce: {
@@ -359,12 +374,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     get().updateProduction();
     get().updateResearch(); // 연구 진행도 업데이트
 
+    // 입찰 관련 처리
+    get().checkBidExpirations(); // 만료된 입찰 처리
+    get().processBidResults();   // 대기 중인 입찰 결과 처리
+
     // 월이 바뀌면 재무 및 경쟁사 업데이트
     if (oldDate.getMonth() !== newDate.getMonth()) {
       get().updateFinancials();
       get().updateCompetitors();
       get().recordMonthlyStatistics();
       get().updatePlanActuals(); // 연간 계획 실적 업데이트
+      get().processBondInterest(); // 회사채 이자 처리
+      get().updateSharePrice();    // 주가 업데이트
     }
 
     // 연도가 바뀌면 새로운 사업계획 다이얼로그 표시
@@ -397,21 +418,78 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     get().checkGameEnd();
   },
 
-  bidOnContract: (contractId: string, bidAmount: number) => {
+  bidOnContract: (contractId: string, bidAmount: number, useBroker: boolean = false, brokerCommission: number = 1.0) => {
     const state = get();
     const contract = state.availableBids.find(c => c.id === contractId);
 
     if (contract) {
-      // 입찰 로직 (나중에 확률 기반으로 확장)
+      // 입찰 경쟁력 계산
+      const competitiveness = BidGenerator.calculateBidCompetitiveness(
+        contract,
+        bidAmount,
+        state.reputation,
+        useBroker,
+        brokerCommission
+      );
+
+      // 입찰 결과 결정
+      const bidResultRaw = BidGenerator.determineBidResult(competitiveness);
+      const bidResult: BidResult = bidResultRaw === 'DELAYED' ? 'PENDING' : bidResultRaw;
+
+      // 브로커 비용 처리 (입찰 시 선불)
+      let brokerCost = 0;
+      if (useBroker) {
+        brokerCost = bidAmount * (brokerCommission / 100);
+      }
+
+      // 계약 상태 결정
+      let newStatus: ContractStatus = 'NEGOTIATING';
+      if (bidResult === 'LOST') {
+        newStatus = 'CANCELLED';
+      }
+
       const updatedContract = {
         ...contract,
         contractPrice: bidAmount,
-        status: 'NEGOTIATING' as ContractStatus,
+        bidAmount: bidAmount,
+        status: newStatus,
+        bidResult: bidResult,
+        usedBroker: useBroker,
+        brokerCommission: useBroker ? brokerCommission : undefined,
       };
+
+      // 토스트 알림
+      const { addToast } = useToastStore.getState();
+      if (bidResult === 'WON') {
+        addToast({
+          type: 'success',
+          title: '입찰 성공!',
+          message: `${contract.shipSpec.name} 입찰에 성공했습니다. 계약 체결을 진행하세요.`,
+          duration: 5000,
+        });
+      } else if (bidResult === 'LOST') {
+        addToast({
+          type: 'error',
+          title: '입찰 실패',
+          message: `${contract.shipSpec.name} 입찰에서 탈락했습니다.`,
+          duration: 5000,
+        });
+      } else {
+        addToast({
+          type: 'info',
+          title: '입찰 결과 대기 중',
+          message: `${contract.shipSpec.name} 입찰 결과가 곧 발표됩니다.`,
+          duration: 5000,
+        });
+      }
 
       set({
         availableBids: state.availableBids.filter(c => c.id !== contractId),
-        contracts: [...state.contracts, updatedContract],
+        contracts: bidResult !== 'LOST' ? [...state.contracts, updatedContract] : state.contracts,
+        financials: {
+          ...state.financials,
+          cash: state.financials.cash - brokerCost, // 브로커 비용 차감
+        },
       });
     }
   },
@@ -1468,6 +1546,333 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     set({
       showAnnualPlanDialog: false,
       pendingPlanYear: null,
+    });
+  },
+
+  // 입찰 시스템 액션들
+  checkBidExpirations: () => {
+    const state = get();
+    const currentDate = new Date(state.currentDate);
+    const { addToast } = useToastStore.getState();
+
+    // 만료된 입찰 확인
+    const expiredBids = state.availableBids.filter(bid => {
+      if (!bid.bidDeadline) return false;
+      return new Date(bid.bidDeadline) < currentDate;
+    });
+
+    if (expiredBids.length > 0) {
+      // 만료된 입찰 알림
+      expiredBids.forEach(bid => {
+        addToast({
+          type: 'warning',
+          title: '입찰 마감',
+          message: `${bid.shipSpec.name} 입찰이 마감되었습니다.`,
+          duration: 4000,
+        });
+      });
+
+      // 만료된 입찰 제거
+      set({
+        availableBids: state.availableBids.filter(bid => {
+          if (!bid.bidDeadline) return true;
+          return new Date(bid.bidDeadline) >= currentDate;
+        }),
+      });
+    }
+  },
+
+  processBidResults: () => {
+    const state = get();
+    const { addToast } = useToastStore.getState();
+
+    // PENDING 상태인 계약들 처리 (일정 확률로 결과 결정)
+    const pendingContracts = state.contracts.filter(c =>
+      c.status === 'NEGOTIATING' && c.bidResult === 'PENDING'
+    );
+
+    if (pendingContracts.length === 0) return;
+
+    // 매일 10% 확률로 결과 발표
+    const updatedContracts = state.contracts.map(contract => {
+      if (contract.status !== 'NEGOTIATING' || contract.bidResult !== 'PENDING') {
+        return contract;
+      }
+
+      if (Math.random() < 0.1) {
+        // 결과 결정
+        const competitiveness = BidGenerator.calculateBidCompetitiveness(
+          contract,
+          contract.bidAmount || contract.contractPrice,
+          state.reputation,
+          contract.usedBroker || false,
+          contract.brokerCommission || 1.0
+        );
+
+        const finalResult = Math.random() < (competitiveness / 100) ? 'WON' : 'LOST';
+
+        if (finalResult === 'WON') {
+          addToast({
+            type: 'success',
+            title: '입찰 성공!',
+            message: `${contract.shipSpec.name} 입찰에 최종 선정되었습니다!`,
+            duration: 5000,
+          });
+          return {
+            ...contract,
+            bidResult: 'WON' as BidResult,
+          };
+        } else {
+          addToast({
+            type: 'error',
+            title: '입찰 탈락',
+            message: `${contract.shipSpec.name} 입찰에서 탈락했습니다.`,
+            duration: 5000,
+          });
+          return {
+            ...contract,
+            bidResult: 'LOST' as BidResult,
+            status: 'CANCELLED' as ContractStatus,
+          };
+        }
+      }
+
+      return contract;
+    });
+
+    // 취소된 계약 제거
+    set({
+      contracts: updatedContracts.filter(c => c.status !== 'CANCELLED'),
+    });
+  },
+
+  // 재무 확장 액션들
+  issueCorporateBond: (principal: number, interestRate: number, years: number, frequency: 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL') => {
+    const state = get();
+    const currentDate = new Date(state.currentDate);
+
+    // 최소 발행 조건 확인
+    if (principal < 10) {
+      return false; // 최소 1천만 달러
+    }
+
+    // 신용등급에 따른 최대 발행 한도 (자본의 200%)
+    const maxBondAmount = state.financials.equity * 2;
+    const currentBondTotal = state.corporateBonds
+      .filter(b => b.isActive)
+      .reduce((sum, b) => sum + b.principal, 0);
+
+    if (currentBondTotal + principal > maxBondAmount) {
+      return false;
+    }
+
+    const maturityDate = new Date(currentDate);
+    maturityDate.setFullYear(maturityDate.getFullYear() + years);
+
+    const newBond: CorporateBond = {
+      id: `BOND_${Date.now()}`,
+      issueDate: new Date(currentDate),
+      maturityDate,
+      principal,
+      interestRate,
+      paymentFrequency: frequency,
+      isActive: true,
+      totalInterestPaid: 0,
+    };
+
+    // 재무제표 업데이트 - 회사채는 장기부채로 처리
+    set({
+      corporateBonds: [...state.corporateBonds, newBond],
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash + principal, // 현금 증가
+        longTermDebt: state.financials.longTermDebt + principal, // 장기부채 증가
+        totalLiabilities: state.financials.totalLiabilities + principal,
+        debtToEquityRatio: (state.financials.totalLiabilities + principal) / state.financials.equity,
+      },
+    });
+
+    const { addToast } = useToastStore.getState();
+    addToast({
+      type: 'success',
+      title: '회사채 발행 완료',
+      message: `$${principal}M 규모의 회사채가 발행되었습니다. (연 ${(interestRate * 100).toFixed(1)}%, ${years}년 만기)`,
+      duration: 5000,
+    });
+
+    return true;
+  },
+
+  repayCorporateBond: (bondId: string) => {
+    const state = get();
+    const bond = state.corporateBonds.find(b => b.id === bondId && b.isActive);
+
+    if (!bond || state.financials.cash < bond.principal) {
+      return false;
+    }
+
+    set({
+      corporateBonds: state.corporateBonds.map(b =>
+        b.id === bondId ? { ...b, isActive: false } : b
+      ),
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash - bond.principal,
+        longTermDebt: state.financials.longTermDebt - bond.principal,
+        totalLiabilities: state.financials.totalLiabilities - bond.principal,
+        debtToEquityRatio: Math.max(0, (state.financials.totalLiabilities - bond.principal) / state.financials.equity),
+      },
+    });
+
+    const { addToast } = useToastStore.getState();
+    addToast({
+      type: 'success',
+      title: '회사채 상환 완료',
+      message: `$${bond.principal}M 규모의 회사채가 상환되었습니다.`,
+      duration: 5000,
+    });
+
+    return true;
+  },
+
+  issueStock: (shares: number, pricePerShare: number, type: 'RIGHTS_OFFERING' | 'PRIVATE_PLACEMENT') => {
+    const state = get();
+
+    // 최소 발행 조건
+    if (shares < 10000 || pricePerShare <= 0) {
+      return false;
+    }
+
+    // 유상증자는 기존 주식 수의 50% 이내로 제한
+    const maxNewShares = state.totalShares * 0.5;
+    if (shares > maxNewShares) {
+      return false;
+    }
+
+    const totalRaised = (shares * pricePerShare) / 1_000_000; // 백만 달러 단위
+    const dilutionEffect = shares / (state.totalShares + shares);
+
+    const newIssuance: StockIssuance = {
+      id: `STOCK_${Date.now()}`,
+      issueDate: new Date(state.currentDate),
+      sharesIssued: shares,
+      pricePerShare,
+      totalRaised,
+      type,
+      dilutionEffect,
+    };
+
+    // 재무제표 업데이트 - 주식 발행은 자본 증가
+    const newTotalShares = state.totalShares + shares;
+    set({
+      stockIssuances: [...state.stockIssuances, newIssuance],
+      totalShares: newTotalShares,
+      financials: {
+        ...state.financials,
+        cash: state.financials.cash + totalRaised, // 현금 증가
+        equity: state.financials.equity + totalRaised, // 자본 증가
+        totalAssets: state.financials.totalAssets + totalRaised,
+        debtToEquityRatio: state.financials.totalLiabilities / (state.financials.equity + totalRaised),
+      },
+    });
+
+    const { addToast } = useToastStore.getState();
+    const typeLabel = type === 'RIGHTS_OFFERING' ? '주주배정' : '제3자배정';
+    addToast({
+      type: 'success',
+      title: '유상증자 완료',
+      message: `${typeLabel} 유상증자로 $${totalRaised.toFixed(1)}M을 조달했습니다. (${shares.toLocaleString()}주 @ $${pricePerShare})`,
+      duration: 5000,
+    });
+
+    return true;
+  },
+
+  processBondInterest: () => {
+    const state = get();
+    const currentDate = new Date(state.currentDate);
+    const currentMonth = currentDate.getMonth();
+
+    let totalInterest = 0;
+
+    const updatedBonds = state.corporateBonds.map(bond => {
+      if (!bond.isActive) return bond;
+
+      // 이자 지급 주기 확인
+      let shouldPayInterest = false;
+      if (bond.paymentFrequency === 'QUARTERLY' && currentMonth % 3 === 0) {
+        shouldPayInterest = true;
+      } else if (bond.paymentFrequency === 'SEMI_ANNUAL' && currentMonth % 6 === 0) {
+        shouldPayInterest = true;
+      } else if (bond.paymentFrequency === 'ANNUAL' && currentMonth === 0) {
+        shouldPayInterest = true;
+      }
+
+      if (shouldPayInterest) {
+        const periodsPerYear = bond.paymentFrequency === 'QUARTERLY' ? 4 :
+                              bond.paymentFrequency === 'SEMI_ANNUAL' ? 2 : 1;
+        const interestPayment = (bond.principal * bond.interestRate) / periodsPerYear;
+        totalInterest += interestPayment;
+
+        return {
+          ...bond,
+          totalInterestPaid: bond.totalInterestPaid + interestPayment,
+        };
+      }
+
+      return bond;
+    });
+
+    if (totalInterest > 0) {
+      set({
+        corporateBonds: updatedBonds,
+        financials: {
+          ...state.financials,
+          cash: state.financials.cash - totalInterest,
+          interestExpense: state.financials.interestExpense + totalInterest,
+        },
+      });
+
+      const { addToast } = useToastStore.getState();
+      addToast({
+        type: 'info',
+        title: '회사채 이자 지급',
+        message: `회사채 이자 $${totalInterest.toFixed(2)}M이 지급되었습니다.`,
+        duration: 3000,
+      });
+    }
+
+    // 만기 도래 회사채 확인
+    state.corporateBonds.forEach(bond => {
+      if (bond.isActive && new Date(bond.maturityDate) <= currentDate) {
+        const { addToast } = useToastStore.getState();
+        addToast({
+          type: 'warning',
+          title: '회사채 만기 도래',
+          message: `$${bond.principal}M 규모의 회사채가 만기 도래했습니다. 상환이 필요합니다.`,
+          duration: 5000,
+        });
+      }
+    });
+  },
+
+  updateSharePrice: () => {
+    const state = get();
+
+    // 주가 = (자본 / 총 주식 수) * 조정 계수
+    // 조정 계수는 평판, 수익성 등을 반영
+    const bookValue = (state.financials.equity * 1_000_000) / state.totalShares;
+
+    // PBR (주가순자산비율) 조정 - 평판과 수익성 기반
+    const reputationMultiplier = 0.5 + (state.reputation / 100) * 1.0; // 0.5 ~ 1.5
+    const profitabilityMultiplier = state.financials.netIncome > 0
+      ? 1.0 + (state.financials.returnOnEquity * 2)
+      : 0.8;
+
+    const newSharePrice = bookValue * reputationMultiplier * profitabilityMultiplier;
+
+    set({
+      sharePrice: Math.max(1, newSharePrice), // 최소 $1
     });
   },
 }));

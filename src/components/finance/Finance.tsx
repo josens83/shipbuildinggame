@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { FinanceCalculator } from '../../engine/financeCalculator';
 import {
@@ -6,11 +7,39 @@ import {
   CreditCard,
   PieChart,
   AlertCircle,
+  Banknote,
+  BarChart3,
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function Finance() {
-  const { financials, takeLoan, repayLoan, creditLine, creditUsed, workforce, docks } =
-    useGameStore();
+  const {
+    financials,
+    takeLoan,
+    repayLoan,
+    creditLine,
+    creditUsed,
+    workforce,
+    docks,
+    corporateBonds,
+    stockIssuances,
+    totalShares,
+    sharePrice,
+    issueCorporateBond,
+    repayCorporateBond,
+    issueStock,
+  } = useGameStore();
+
+  // 회사채 발행 상태
+  const [bondPrincipal, setBondPrincipal] = useState<number>(50);
+  const [bondRate, setBondRate] = useState<number>(5);
+  const [bondYears, setBondYears] = useState<number>(3);
+  const [bondFrequency, setBondFrequency] = useState<'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL'>('SEMI_ANNUAL');
+
+  // 유상증자 상태
+  const [stockShares, setStockShares] = useState<number>(100000);
+  const [stockPrice, setStockPrice] = useState<number>(Math.round(sharePrice));
+  const [stockType, setStockType] = useState<'RIGHTS_OFFERING' | 'PRIVATE_PLACEMENT'>('RIGHTS_OFFERING');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -376,6 +405,245 @@ export default function Finance() {
               </p>
               <p className="text-xs text-gray-400 mt-1">인건비 + 유지비 + 간접비</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 자본 조달 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 회사채 발행 */}
+        <div className="card">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+            <Banknote className="w-5 h-5 mr-2 text-yellow-400" />
+            회사채 발행
+          </h2>
+
+          <div className="space-y-4">
+            {/* 발행 한도 정보 */}
+            <div className="bg-gray-700/50 p-3 rounded">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">발행 가능 한도</span>
+                <span className="text-white">
+                  {formatCurrency(
+                    Math.max(0, financials.equity * 2 -
+                      corporateBonds.filter(b => b.isActive).reduce((sum, b) => sum + b.principal, 0))
+                  )}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">자본의 200%까지 발행 가능</p>
+            </div>
+
+            {/* 발행 조건 입력 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">발행 금액 ($M)</label>
+                <input
+                  type="number"
+                  value={bondPrincipal}
+                  onChange={(e) => setBondPrincipal(Number(e.target.value))}
+                  className="input-field w-full"
+                  min={10}
+                  step={10}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">이자율 (%)</label>
+                <input
+                  type="number"
+                  value={bondRate}
+                  onChange={(e) => setBondRate(Number(e.target.value))}
+                  className="input-field w-full"
+                  min={1}
+                  max={15}
+                  step={0.5}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">만기 (년)</label>
+                <select
+                  value={bondYears}
+                  onChange={(e) => setBondYears(Number(e.target.value))}
+                  className="input-field w-full"
+                >
+                  <option value={1}>1년</option>
+                  <option value={2}>2년</option>
+                  <option value={3}>3년</option>
+                  <option value={5}>5년</option>
+                  <option value={7}>7년</option>
+                  <option value={10}>10년</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">이자 지급</label>
+                <select
+                  value={bondFrequency}
+                  onChange={(e) => setBondFrequency(e.target.value as typeof bondFrequency)}
+                  className="input-field w-full"
+                >
+                  <option value="QUARTERLY">분기별</option>
+                  <option value="SEMI_ANNUAL">반기별</option>
+                  <option value="ANNUAL">연간</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 예상 연간 이자 */}
+            <div className="bg-gray-700/30 p-2 rounded text-sm">
+              <span className="text-gray-400">예상 연간 이자: </span>
+              <span className="text-yellow-400 font-semibold">
+                {formatCurrency(bondPrincipal * (bondRate / 100))}
+              </span>
+            </div>
+
+            <button
+              onClick={() => issueCorporateBond(bondPrincipal, bondRate / 100, bondYears, bondFrequency)}
+              className="btn-primary w-full"
+            >
+              회사채 발행
+            </button>
+
+            {/* 발행된 회사채 목록 */}
+            {corporateBonds.filter(b => b.isActive).length > 0 && (
+              <div className="border-t border-gray-700 pt-4">
+                <h3 className="text-sm font-semibold text-gray-300 mb-2">발행된 회사채</h3>
+                <div className="space-y-2">
+                  {corporateBonds.filter(b => b.isActive).map(bond => (
+                    <div key={bond.id} className="bg-gray-700/50 p-3 rounded flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-white">${bond.principal}M @ {(bond.interestRate * 100).toFixed(1)}%</p>
+                        <p className="text-xs text-gray-400">
+                          만기: {format(new Date(bond.maturityDate), 'yyyy-MM-dd')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => repayCorporateBond(bond.id)}
+                        className="btn-secondary text-xs py-1 px-2"
+                        disabled={financials.cash < bond.principal}
+                      >
+                        상환
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 유상증자 */}
+        <div className="card">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+            <BarChart3 className="w-5 h-5 mr-2 text-purple-400" />
+            유상증자
+          </h2>
+
+          <div className="space-y-4">
+            {/* 주식 정보 */}
+            <div className="bg-gray-700/50 p-3 rounded">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-400">총 발행 주식</span>
+                  <p className="text-white font-semibold">{totalShares.toLocaleString()}주</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">현재 주가</span>
+                  <p className="text-white font-semibold">${sharePrice.toFixed(2)}</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">시가총액</span>
+                  <p className="text-white font-semibold">
+                    {formatCurrency((totalShares * sharePrice) / 1_000_000)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-400">최대 발행 가능</span>
+                  <p className="text-white font-semibold">{(totalShares * 0.5).toLocaleString()}주</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 발행 조건 입력 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">발행 주식 수</label>
+                <input
+                  type="number"
+                  value={stockShares}
+                  onChange={(e) => setStockShares(Number(e.target.value))}
+                  className="input-field w-full"
+                  min={10000}
+                  step={10000}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">발행가 ($)</label>
+                <input
+                  type="number"
+                  value={stockPrice}
+                  onChange={(e) => setStockPrice(Number(e.target.value))}
+                  className="input-field w-full"
+                  min={1}
+                  step={1}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">증자 유형</label>
+                <select
+                  value={stockType}
+                  onChange={(e) => setStockType(e.target.value as typeof stockType)}
+                  className="input-field w-full"
+                >
+                  <option value="RIGHTS_OFFERING">주주배정 (기존 주주 우선)</option>
+                  <option value="PRIVATE_PLACEMENT">제3자배정 (외부 투자자)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 예상 조달 금액 & 희석률 */}
+            <div className="bg-gray-700/30 p-3 rounded space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">예상 조달 금액</span>
+                <span className="text-green-400 font-semibold">
+                  {formatCurrency((stockShares * stockPrice) / 1_000_000)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">지분 희석률</span>
+                <span className="text-yellow-400 font-semibold">
+                  {((stockShares / (totalShares + stockShares)) * 100).toFixed(1)}%
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => issueStock(stockShares, stockPrice, stockType)}
+              className="btn-primary w-full"
+            >
+              유상증자 실행
+            </button>
+
+            {/* 증자 이력 */}
+            {stockIssuances.length > 0 && (
+              <div className="border-t border-gray-700 pt-4">
+                <h3 className="text-sm font-semibold text-gray-300 mb-2">증자 이력</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {stockIssuances.map(issuance => (
+                    <div key={issuance.id} className="bg-gray-700/50 p-2 rounded">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-white">
+                          {issuance.sharesIssued.toLocaleString()}주 @ ${issuance.pricePerShare}
+                        </span>
+                        <span className="text-green-400">${issuance.totalRaised.toFixed(1)}M</span>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        {format(new Date(issuance.issueDate), 'yyyy-MM-dd')} •
+                        {issuance.type === 'RIGHTS_OFFERING' ? ' 주주배정' : ' 제3자배정'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { Briefcase, Users, Calendar, Clock } from 'lucide-react';
+import { Briefcase, Users, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Sales() {
@@ -8,6 +8,7 @@ export default function Sales() {
     availableBids,
     contracts,
     customers,
+    currentDate,
     bidOnContract,
     signContract,
     generateBids,
@@ -39,6 +40,15 @@ export default function Sales() {
     return `설계 ${designMonths}개월 + 생산 ${productionMonths}개월`;
   };
 
+  // 입찰 마감까지 남은 일수 계산
+  const getDaysUntilDeadline = (deadline: Date | undefined): number => {
+    if (!deadline) return 999;
+    const deadlineDate = new Date(deadline);
+    const today = new Date(currentDate);
+    const diffTime = deadlineDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   const pendingContracts = contracts.filter((c) => c.status === 'NEGOTIATING');
   const signedContracts = contracts.filter(
     (c) => c.status === 'SIGNED' || c.status === 'IN_PRODUCTION'
@@ -51,9 +61,11 @@ export default function Sales() {
 
   const handleBidSubmit = (contractId: string) => {
     if (bidAmount > 0) {
-      bidOnContract(contractId, bidAmount);
+      bidOnContract(contractId, bidAmount, useBroker, brokerCommission);
       setSelectedBid(null);
       setBidAmount(0);
+      setUseBroker(false);
+      setBrokerCommission(1.0);
     }
   };
 
@@ -111,9 +123,23 @@ export default function Sales() {
                       고객: {getCustomerName(bid.customerId)}
                     </p>
                   </div>
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded text-sm">
-                    입찰 가능
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded text-sm">
+                      입찰 가능
+                    </span>
+                    {bid.bidDeadline && (
+                      <span className={`flex items-center gap-1 text-xs ${
+                        getDaysUntilDeadline(bid.bidDeadline) <= 3
+                          ? 'text-red-400'
+                          : getDaysUntilDeadline(bid.bidDeadline) <= 7
+                          ? 'text-yellow-400'
+                          : 'text-gray-400'
+                      }`}>
+                        <AlertTriangle className="w-3 h-3" />
+                        마감 D-{getDaysUntilDeadline(bid.bidDeadline)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
