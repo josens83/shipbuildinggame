@@ -202,6 +202,24 @@ export default function Layout({ children }: LayoutProps) {
                 </button>
 
                 <button
+                  onClick={() => advanceTime(5)}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-xs text-white"
+                  title="수동으로 5일 진행"
+                >
+                  +5일
+                </button>
+
+                <button
+                  onClick={() => advanceTime(30)}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-xs text-white"
+                  title="수동으로 30일 진행"
+                >
+                  +30일
+                </button>
+
+                <div className="w-px h-6 bg-gray-600" />
+
+                <button
                   onClick={toggleGameSpeed}
                   className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
                   title={`속도: ${gameSpeed}x (클릭하여 변경)`}

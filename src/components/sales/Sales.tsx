@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, Users, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Sales() {
@@ -15,8 +15,8 @@ export default function Sales() {
 
   const [selectedBid, setSelectedBid] = useState<string | null>(null);
   const [bidAmount, setBidAmount] = useState<number>(0);
-
-  // useEffect 제거 - 이제 게임 시작 시 자동 생성됨
+  const [useBroker, setUseBroker] = useState<boolean>(false);
+  const [brokerCommission, setBrokerCommission] = useState<number>(1.0); // 1% default
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -25,6 +25,18 @@ export default function Sales() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount * 1_000_000);
+  };
+
+  // 금액을 $1M 단위로 반올림
+  const roundToMillion = (amount: number): number => {
+    return Math.round(amount);
+  };
+
+  // 설계+생산 기간을 개월로 표시
+  const formatDuration = (designDays: number, productionDays: number): string => {
+    const designMonths = Math.round(designDays / 30);
+    const productionMonths = Math.round(productionDays / 30);
+    return `설계 ${designMonths}개월 + 생산 ${productionMonths}개월`;
   };
 
   const pendingContracts = contracts.filter((c) => c.status === 'NEGOTIATING');
@@ -118,7 +130,7 @@ export default function Sales() {
                   <div>
                     <p className="text-xs text-gray-500">예상 금액</p>
                     <p className="text-sm text-white">
-                      {formatCurrency(bid.contractPrice)}
+                      {formatCurrency(roundToMillion(bid.contractPrice))}
                     </p>
                   </div>
                   <div>
@@ -131,43 +143,103 @@ export default function Sales() {
                   </div>
                 </div>
 
+                {/* 건조 일정 정보 추가 */}
+                <div className="flex items-center gap-4 text-xs text-gray-400 mb-3 bg-gray-800/50 p-2 rounded">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDuration(bid.shipSpec.designDays, bid.shipSpec.estimatedDays)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>총 {Math.round((bid.shipSpec.designDays + bid.shipSpec.estimatedDays) / 30)}개월</span>
+                  </div>
+                </div>
+
                 {selectedBid === bid.id ? (
-                  <div className="bg-gray-800 p-4 rounded mt-3">
-                    <label className="block text-sm text-gray-400 mb-2">
-                      입찰 금액 (백만 달러)
-                    </label>
+                  <div className="bg-gray-800 p-4 rounded mt-3 space-y-4">
+                    {/* 입찰 금액 입력 */}
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">
+                        입찰 금액 (백만 달러, $1M 단위)
+                      </label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="number"
+                          value={bidAmount || ''}
+                          onChange={(e) => setBidAmount(roundToMillion(Number(e.target.value)))}
+                          className="input-field flex-1"
+                          placeholder={roundToMillion(bid.contractPrice).toString()}
+                          min={0}
+                          step={1}
+                        />
+                        <span className="flex items-center text-gray-400 text-sm">M</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        권장 금액: ${roundToMillion(bid.contractPrice * 0.95)}M - ${roundToMillion(bid.contractPrice * 1.05)}M
+                      </p>
+                    </div>
+
+                    {/* 브로커 옵션 */}
+                    <div className="border-t border-gray-700 pt-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useBroker}
+                          onChange={(e) => setUseBroker(e.target.checked)}
+                          className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+                        />
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-300">브로커 사용</span>
+                        <span className="text-xs text-gray-500">(수주 확률 +15%)</span>
+                      </label>
+
+                      {useBroker && (
+                        <div className="mt-2 ml-6">
+                          <label className="text-xs text-gray-400">커미션 비율</label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="range"
+                              min={0.5}
+                              max={2.0}
+                              step={0.1}
+                              value={brokerCommission}
+                              onChange={(e) => setBrokerCommission(Number(e.target.value))}
+                              className="flex-1"
+                            />
+                            <span className="text-sm text-yellow-400 w-12">{brokerCommission.toFixed(1)}%</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            브로커 비용: {formatCurrency(bidAmount * brokerCommission / 100)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 버튼 */}
                     <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        value={bidAmount || ''}
-                        onChange={(e) => setBidAmount(Number(e.target.value))}
-                        className="input-field flex-1"
-                        placeholder={bid.contractPrice.toString()}
-                        min={0}
-                      />
                       <button
                         onClick={() => handleBidSubmit(bid.id)}
-                        className="btn-primary"
+                        className="btn-primary flex-1"
                       >
-                        제출
+                        입찰 제출
                       </button>
                       <button
-                        onClick={() => setSelectedBid(null)}
+                        onClick={() => {
+                          setSelectedBid(null);
+                          setUseBroker(false);
+                        }}
                         className="btn-secondary"
                       >
                         취소
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      권장 금액: {formatCurrency(bid.contractPrice * 0.95)} -{' '}
-                      {formatCurrency(bid.contractPrice * 1.05)}
-                    </p>
                   </div>
                 ) : (
                   <button
                     onClick={() => {
                       setSelectedBid(bid.id);
-                      setBidAmount(bid.contractPrice);
+                      setBidAmount(roundToMillion(bid.contractPrice));
+                      setUseBroker(false);
                     }}
                     className="btn-primary w-full mt-3"
                   >
@@ -204,11 +276,11 @@ export default function Sales() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   <div>
                     <p className="text-xs text-gray-500">입찰 금액</p>
                     <p className="text-sm text-white">
-                      {formatCurrency(contract.contractPrice)}
+                      {formatCurrency(roundToMillion(contract.contractPrice))}
                     </p>
                   </div>
                   <div>
@@ -218,9 +290,17 @@ export default function Sales() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">납기</p>
+                    <p className="text-xs text-gray-500">생산 기간</p>
                     <p className="text-sm text-white">
-                      {contract.shipSpec.estimatedDays}일
+                      {Math.round(contract.shipSpec.estimatedDays / 30)}개월
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">납기일</p>
+                    <p className="text-sm text-white">
+                      {contract.deliveryDate
+                        ? format(new Date(contract.deliveryDate), 'yyyy-MM-dd')
+                        : 'N/A'}
                     </p>
                   </div>
                 </div>

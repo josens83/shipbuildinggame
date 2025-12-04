@@ -76,9 +76,11 @@ export class BidGenerator {
     const priceVariation = 0.9 + Math.random() * 0.2;
     const estimatedPrice = shipSpec.estimatedCost * priceVariation;
 
-    // 납기일 계산
+    // 납기일 계산 (설계 기간 + 생산 기간)
+    // 입찰은 설계 시작 전에 나오므로, 납기일 = 현재 + 설계기간 + 생산기간
+    const totalDays = shipSpec.designDays + shipSpec.estimatedDays;
     const deliveryDate = new Date(currentDate);
-    deliveryDate.setDate(deliveryDate.getDate() + shipSpec.estimatedDays);
+    deliveryDate.setDate(deliveryDate.getDate() + totalDays);
 
     // 계약 조건 (신용등급에 따라 조정)
     const creditScore = this.getCreditScore(customer.creditRating);

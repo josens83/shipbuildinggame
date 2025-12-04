@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store/gameStore';
-import { Factory, Users, Plus } from 'lucide-react';
+import { Factory, Users, Plus, AlertCircle, ArrowRight } from 'lucide-react';
+import type { DockSize } from '../../types';
 
 export default function Production() {
   const {
@@ -39,6 +40,28 @@ export default function Production() {
 
   const occupiedDocks = docks.filter((d) => d.status === 'OCCUPIED').length;
   const availableDocks = docks.filter((d) => d.status === 'AVAILABLE');
+
+  // 도크 크기가 선박 요구사항과 호환되는지 확인
+  const isDockCompatible = (dockSize: DockSize, requiredSize: DockSize): boolean => {
+    const sizeOrder: DockSize[] = ['SMALL', 'MEDIUM', 'LARGE', 'MEGA'];
+    return sizeOrder.indexOf(dockSize) >= sizeOrder.indexOf(requiredSize);
+  };
+
+  // 특정 계약에 호환되는 도크 목록 가져오기
+  const getCompatibleDocks = (requiredSize: DockSize) => {
+    return availableDocks.filter((d) => isDockCompatible(d.size, requiredSize));
+  };
+
+  // 도크 크기 한글 표시
+  const getDockSizeLabel = (size: DockSize): string => {
+    const labels: Record<DockSize, string> = {
+      SMALL: '소형',
+      MEDIUM: '중형',
+      LARGE: '대형',
+      MEGA: '초대형',
+    };
+    return labels[size];
+  };
 
   return (
     <div className="space-y-6">
@@ -221,55 +244,86 @@ export default function Production() {
 
       {/* 대기 중인 계약 - 도크 배정 */}
       {signedContracts.length > 0 && (
-        <div className="card">
-          <h2 className="text-xl font-bold text-white mb-4">도크 배정 대기</h2>
-          <div className="space-y-3">
-            {signedContracts.map((contract) => (
-              <div
-                key={contract.id}
-                className="bg-gray-700/50 p-4 rounded-lg border border-gray-600"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      {contract.shipSpec.name}
-                    </h3>
-                    <p className="text-sm text-gray-400">
-                      {getCustomerName(contract.customerId)}
-                    </p>
-                  </div>
-                  <span className="text-sm text-gray-400">
-                    필요: {contract.shipSpec.requiredDockSize}
-                  </span>
-                </div>
+        <div className="card border-2 border-yellow-600/50">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle className="w-5 h-5 text-yellow-400" />
+            <h2 className="text-xl font-bold text-white">도크 배정 대기</h2>
+            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-sm">
+              {signedContracts.length}건
+            </span>
+          </div>
 
-                <div className="flex space-x-2">
-                  {availableDocks
-                    .filter(
-                      (d) =>
-                        d.size === contract.shipSpec.requiredDockSize ||
-                        (contract.shipSpec.requiredDockSize === 'SMALL' &&
-                          ['MEDIUM', 'LARGE', 'MEGA'].includes(d.size)) ||
-                        (contract.shipSpec.requiredDockSize === 'MEDIUM' &&
-                          ['LARGE', 'MEGA'].includes(d.size)) ||
-                        (contract.shipSpec.requiredDockSize === 'LARGE' &&
-                          d.size === 'MEGA')
-                    )
-                    .map((dock) => (
-                      <button
-                        key={dock.id}
-                        onClick={() => assignContractToDock(contract.id, dock.id)}
-                        className="btn-primary text-sm flex-1"
-                      >
-                        {dock.name}에 배정
-                      </button>
-                    ))}
-                  {availableDocks.length === 0 && (
-                    <p className="text-sm text-gray-500">사용 가능한 도크가 없습니다</p>
+          <p className="text-sm text-gray-400 mb-4">
+            아래 계약을 도크에 배정하면 생산이 시작됩니다. 버튼을 클릭하여 배정하세요.
+          </p>
+
+          <div className="space-y-4">
+            {signedContracts.map((contract) => {
+              const compatibleDocks = getCompatibleDocks(contract.shipSpec.requiredDockSize);
+
+              return (
+                <div
+                  key={contract.id}
+                  className="bg-gray-800 p-4 rounded-lg border-2 border-dashed border-yellow-600/50"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">
+                        {contract.shipSpec.name}
+                      </h3>
+                      <p className="text-sm text-gray-400">
+                        고객: {getCustomerName(contract.customerId)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">
+                        {getDockSizeLabel(contract.shipSpec.requiredDockSize)} 도크 필요
+                      </span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        생산 기간: {Math.round(contract.shipSpec.estimatedDays / 30)}개월
+                      </p>
+                    </div>
+                  </div>
+
+                  {compatibleDocks.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-green-400 mb-2">
+                        호환 가능한 도크 {compatibleDocks.length}개
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {compatibleDocks.map((dock) => (
+                          <button
+                            key={dock.id}
+                            onClick={() => assignContractToDock(contract.id, dock.id)}
+                            className="flex items-center justify-between px-4 py-3 bg-green-600 hover:bg-green-500 rounded-lg transition-colors text-white"
+                          >
+                            <div className="text-left">
+                              <p className="font-semibold">{dock.name}</p>
+                              <p className="text-xs text-green-200">
+                                {getDockSizeLabel(dock.size)} · 효율 {(dock.efficiency * 100).toFixed(0)}%
+                              </p>
+                            </div>
+                            <ArrowRight className="w-5 h-5" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-red-900/20 border border-red-700 rounded-lg p-3">
+                      <p className="text-sm text-red-400 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" />
+                        {availableDocks.length === 0
+                          ? '모든 도크가 사용 중입니다'
+                          : `${getDockSizeLabel(contract.shipSpec.requiredDockSize)} 이상의 가용 도크가 없습니다`}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        새 도크를 건설하거나 기존 작업이 완료될 때까지 기다리세요.
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

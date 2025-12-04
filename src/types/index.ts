@@ -41,7 +41,8 @@ export interface ShipSpecification {
   deadweight: number;    // 재화중량톤 (DWT)
   capacity?: number;     // 용량 (TEU for containers, m³ for tankers)
   estimatedCost: number; // 예상 건조 비용 (백만 달러)
-  estimatedDays: number; // 예상 건조 기간 (일)
+  designDays: number;    // 설계 기간 (일) - 입찰 전 리드타임
+  estimatedDays: number; // 생산 기간 (일) - 도크에서의 건조 기간
   requiredDockSize: DockSize;
   complexity: number;    // 복잡도 (1-10)
 }
