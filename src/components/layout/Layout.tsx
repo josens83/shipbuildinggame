@@ -12,6 +12,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 // 새로운 통합 다이얼로그 시스템
 import DialogManager from '../dialog/DialogManager';
 import MiniGameController from '../minigame/MiniGameController';
+import AnnualPlanDialog from '../planning/AnnualPlanDialog';
 import {
   Anchor,
   LayoutDashboard,
@@ -311,6 +312,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* 통합 다이얼로그 매니저 */}
       <DialogManager />
+
+      {/* 연간 사업계획 다이얼로그 */}
+      <AnnualPlanDialog />
     </div>
   );
 }
