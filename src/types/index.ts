@@ -442,3 +442,108 @@ export interface GameEndState {
     playTime: number;  // 플레이 일수
   };
 }
+
+// ===== 연간 사업계획 시스템 =====
+
+export type PlanScenario = 'OPTIMISTIC' | 'BASE' | 'CONSERVATIVE';
+
+export interface ScenarioConfig {
+  name: string;
+  description: string;
+  // 관리지표
+  targetManHoursPerGT: number;     // 목표 시수 (MH/GT)
+  fixedCostRatio: number;          // 고정비 적용 비율 (0-1)
+  targetProfitMargin: number;      // 목표 이익률 (0-1)
+  outsourcingRatio: number;        // 외주 비율 (0-1)
+  workforceChangeRate: number;     // 인력 증감률 (-1 ~ 1)
+}
+
+export interface AnnualTarget {
+  // 수주 목표
+  orderAmount: number;             // 수주 목표 금액 (백만 달러)
+  orderCount: number;              // 수주 목표 척수
+
+  // 선종별 목표
+  shipTypeTargets: {
+    type: ShipType;
+    count: number;
+    amount: number;
+  }[];
+
+  // 생산 목표
+  productionCount: number;         // 생산 목표 척수
+  deliveryCount: number;           // 인도 목표 척수
+
+  // 재무 목표
+  revenueTarget: number;           // 매출 목표
+  profitTarget: number;            // 이익 목표
+  cashFlowTarget: number;          // 현금흐름 목표
+}
+
+export interface AnnualActual {
+  // 수주 실적
+  orderAmount: number;
+  orderCount: number;
+
+  // 선종별 실적
+  shipTypeActuals: {
+    type: ShipType;
+    count: number;
+    amount: number;
+  }[];
+
+  // 생산 실적
+  productionCount: number;
+  deliveryCount: number;
+
+  // 재무 실적
+  revenue: number;
+  profit: number;
+  cashFlow: number;
+
+  // 효율 지표
+  actualManHoursPerGT: number;
+  actualFixedCostRatio: number;
+  actualProfitMargin: number;
+}
+
+export interface AnnualPlan {
+  year: number;
+  scenario: PlanScenario;
+  scenarioConfig: ScenarioConfig;
+  target: AnnualTarget;
+  actual: AnnualActual;
+  createdAt: Date;
+  isActive: boolean;
+}
+
+// 시나리오 프리셋
+export const SCENARIO_PRESETS: Record<PlanScenario, ScenarioConfig> = {
+  OPTIMISTIC: {
+    name: '낙관적',
+    description: '공격적 수주, 고효율 운영',
+    targetManHoursPerGT: 20,
+    fixedCostRatio: 0.85,
+    targetProfitMargin: 0.18,
+    outsourcingRatio: 0.40,
+    workforceChangeRate: 0.20,
+  },
+  BASE: {
+    name: '기본',
+    description: '안정적 운영, 균형 성장',
+    targetManHoursPerGT: 25,
+    fixedCostRatio: 0.90,
+    targetProfitMargin: 0.15,
+    outsourcingRatio: 0.30,
+    workforceChangeRate: 0,
+  },
+  CONSERVATIVE: {
+    name: '보수적',
+    description: '비용 절감, 리스크 최소화',
+    targetManHoursPerGT: 30,
+    fixedCostRatio: 0.95,
+    targetProfitMargin: 0.12,
+    outsourcingRatio: 0.20,
+    workforceChangeRate: -0.10,
+  },
+};

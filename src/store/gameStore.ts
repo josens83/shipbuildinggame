@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty, TutorialProgress, GameSettings, GameEndState, GameEndReason } from '../types';
+import type { GameState, Dock, FinancialStatement, ContractStatus, GameEvent, ResearchProject, Research, Competitor, Difficulty, TutorialProgress, GameSettings, GameEndState, GameEndReason, AnnualPlan, PlanScenario, AnnualTarget, AnnualActual, ShipType } from '../types';
+import { SCENARIO_PRESETS } from '../types';
 import { INITIAL_CUSTOMERS } from '../data/customers';
 import { INITIAL_COMPETITORS } from '../data/competitors';
 import { BidGenerator } from '../engine/bidGenerator';
@@ -98,6 +99,18 @@ interface GameActions {
   // 게임 종료
   checkGameEnd: () => void;
   resetGame: () => void;
+
+  // 연간 사업계획
+  annualPlans: AnnualPlan[];
+  showAnnualPlanDialog: boolean;
+  pendingPlanYear: number | null;
+  createAnnualPlan: (year: number, scenario: PlanScenario, targets: Partial<AnnualTarget>) => void;
+  updateAnnualPlan: (year: number, updates: Partial<AnnualPlan>) => void;
+  getActivePlan: () => AnnualPlan | undefined;
+  getPlanForYear: (year: number) => AnnualPlan | undefined;
+  updatePlanActuals: () => void;
+  openAnnualPlanDialog: (year: number) => void;
+  closeAnnualPlanDialog: () => void;
 }
 
 const INITIAL_FINANCIALS: FinancialStatement = {
@@ -232,6 +245,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     isEnded: false,
   } as GameEndState,
 
+  // 연간 사업계획
+  annualPlans: [] as AnnualPlan[],
+  showAnnualPlanDialog: false,
+  pendingPlanYear: null as number | null,
+
   // 액션들
   startGame: (companyName: string, difficulty: Difficulty = 'NORMAL') => {
     const settings = getDifficultySettings(difficulty);
@@ -346,6 +364,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       get().updateFinancials();
       get().updateCompetitors();
       get().recordMonthlyStatistics();
+      get().updatePlanActuals(); // 연간 계획 실적 업데이트
+    }
+
+    // 연도가 바뀌면 새로운 사업계획 다이얼로그 표시
+    if (oldDate.getFullYear() !== newDate.getFullYear()) {
+      const newYear = newDate.getFullYear();
+      const existingPlan = get().getPlanForYear(newYear);
+      if (!existingPlan) {
+        get().openAnnualPlanDialog(newYear);
+      }
     }
 
     // 7일마다 새로운 입찰 생성 (입찰이 3개 미만일 때)
@@ -1265,6 +1293,181 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       gameEnd: {
         isEnded: false,
       },
+      // 연간 사업계획 초기화
+      annualPlans: [],
+      showAnnualPlanDialog: false,
+      pendingPlanYear: null,
+    });
+  },
+
+  // 연간 사업계획 액션들
+  createAnnualPlan: (year: number, scenario: PlanScenario, targets: Partial<AnnualTarget>) => {
+    const state = get();
+    const scenarioConfig = SCENARIO_PRESETS[scenario];
+
+    // 기본 목표값 설정
+    const defaultTarget: AnnualTarget = {
+      orderAmount: 500, // 5억 달러
+      orderCount: 5,
+      shipTypeTargets: [],
+      productionCount: 4,
+      deliveryCount: 3,
+      revenueTarget: 400,
+      profitTarget: 60,
+      cashFlowTarget: 50,
+    };
+
+    // 기본 실적값 초기화
+    const initialActual: AnnualActual = {
+      orderAmount: 0,
+      orderCount: 0,
+      shipTypeActuals: [],
+      productionCount: 0,
+      deliveryCount: 0,
+      revenue: 0,
+      profit: 0,
+      cashFlow: 0,
+      actualManHoursPerGT: 0,
+      actualFixedCostRatio: 0,
+      actualProfitMargin: 0,
+    };
+
+    const newPlan: AnnualPlan = {
+      year,
+      scenario,
+      scenarioConfig,
+      target: { ...defaultTarget, ...targets },
+      actual: initialActual,
+      createdAt: new Date(state.currentDate),
+      isActive: true,
+    };
+
+    // 기존 해당 연도 계획이 있으면 비활성화
+    const updatedPlans = state.annualPlans.map(plan =>
+      plan.year === year ? { ...plan, isActive: false } : plan
+    );
+
+    set({
+      annualPlans: [...updatedPlans, newPlan],
+      showAnnualPlanDialog: false,
+      pendingPlanYear: null,
+    });
+  },
+
+  updateAnnualPlan: (year: number, updates: Partial<AnnualPlan>) => {
+    const state = get();
+    set({
+      annualPlans: state.annualPlans.map(plan =>
+        plan.year === year && plan.isActive
+          ? { ...plan, ...updates }
+          : plan
+      ),
+    });
+  },
+
+  getActivePlan: () => {
+    const state = get();
+    const currentYear = state.currentDate.getFullYear();
+    return state.annualPlans.find(plan => plan.year === currentYear && plan.isActive);
+  },
+
+  getPlanForYear: (year: number) => {
+    const state = get();
+    return state.annualPlans.find(plan => plan.year === year && plan.isActive);
+  },
+
+  updatePlanActuals: () => {
+    const state = get();
+    const currentYear = state.currentDate.getFullYear();
+    const activePlan = state.annualPlans.find(plan => plan.year === currentYear && plan.isActive);
+
+    if (!activePlan) return;
+
+    // 현재 연도의 계약들 집계
+    const yearContracts = state.contracts.filter(c => {
+      const contractDate = c.contractDate ? new Date(c.contractDate) : null;
+      return contractDate && contractDate.getFullYear() === currentYear;
+    });
+
+    // 수주 실적 계산
+    const orderAmount = yearContracts.reduce((sum, c) => sum + c.contractPrice, 0);
+    const orderCount = yearContracts.length;
+
+    // 선종별 실적
+    const shipTypeMap = new Map<ShipType, { count: number; amount: number }>();
+    yearContracts.forEach(c => {
+      const type = c.shipSpec.type;
+      const existing = shipTypeMap.get(type) || { count: 0, amount: 0 };
+      shipTypeMap.set(type, {
+        count: existing.count + 1,
+        amount: existing.amount + c.contractPrice,
+      });
+    });
+
+    const shipTypeActuals = Array.from(shipTypeMap.entries()).map(([type, data]) => ({
+      type,
+      count: data.count,
+      amount: data.amount,
+    }));
+
+    // 생산/인도 실적 (완료된 계약 기준)
+    const completedThisYear = state.contracts.filter(c => {
+      return c.status === 'COMPLETED' || c.status === 'DELIVERED';
+    });
+    const deliveryCount = completedThisYear.length;
+    const productionCount = state.contracts.filter(c => c.status === 'IN_PRODUCTION').length + deliveryCount;
+
+    // 재무 실적
+    const revenue = state.financials.revenue;
+    const profit = state.financials.netIncome;
+    const cashFlow = state.financials.operatingCashFlow;
+
+    // 효율 지표 계산 (간략화)
+    const totalGT = yearContracts.reduce((sum, c) => sum + (c.shipSpec.deadweight / 1000), 0);
+    const totalWorkers = state.workforce.welders + state.workforce.fitters +
+                        state.workforce.painters + state.workforce.electricians +
+                        state.workforce.engineers;
+    const workingDays = 250; // 연간 근무일
+    const totalManHours = totalWorkers * 8 * workingDays;
+    const actualManHoursPerGT = totalGT > 0 ? totalManHours / totalGT : 0;
+
+    const actualProfitMargin = revenue > 0 ? profit / revenue : 0;
+    const actualFixedCostRatio = revenue > 0 ? state.financials.operatingExpenses / revenue : 0;
+
+    const updatedActual: AnnualActual = {
+      orderAmount,
+      orderCount,
+      shipTypeActuals,
+      productionCount,
+      deliveryCount,
+      revenue,
+      profit,
+      cashFlow,
+      actualManHoursPerGT,
+      actualFixedCostRatio,
+      actualProfitMargin,
+    };
+
+    set({
+      annualPlans: state.annualPlans.map(plan =>
+        plan.year === currentYear && plan.isActive
+          ? { ...plan, actual: updatedActual }
+          : plan
+      ),
+    });
+  },
+
+  openAnnualPlanDialog: (year: number) => {
+    set({
+      showAnnualPlanDialog: true,
+      pendingPlanYear: year,
+    });
+  },
+
+  closeAnnualPlanDialog: () => {
+    set({
+      showAnnualPlanDialog: false,
+      pendingPlanYear: null,
     });
   },
 }));

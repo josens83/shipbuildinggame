@@ -7,6 +7,8 @@ import {
   Users,
   Factory,
   AlertCircle,
+  Target,
+  Calendar,
 } from 'lucide-react';
 import { FinanceCalculator } from '../engine/financeCalculator';
 
@@ -20,7 +22,12 @@ export default function Dashboard() {
     totalShipsBuilt,
     reputation,
     marketShare,
+    currentDate,
+    getActivePlan,
+    openAnnualPlanDialog,
   } = useGameStore();
+
+  const activePlan = getActivePlan();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -158,6 +165,177 @@ export default function Dashboard() {
                 ))}
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 연간 계획 대비 실적 */}
+      {activePlan ? (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-white flex items-center">
+              <Target className="w-5 h-5 mr-2 text-blue-400" />
+              {activePlan.year}년 사업계획 현황
+            </h2>
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                activePlan.scenario === 'OPTIMISTIC' ? 'bg-green-500/20 text-green-400' :
+                activePlan.scenario === 'CONSERVATIVE' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-blue-500/20 text-blue-400'
+              }`}>
+                {activePlan.scenarioConfig.name}
+              </span>
+              <button
+                onClick={() => openAnnualPlanDialog(activePlan.year)}
+                className="text-xs text-gray-400 hover:text-white"
+              >
+                수정
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            {/* 수주 금액 */}
+            <div className="bg-gray-700/50 p-3 rounded-lg">
+              <p className="text-xs text-gray-400 mb-1">수주 금액</p>
+              <div className="flex items-end gap-2">
+                <span className="text-lg font-bold text-white">
+                  ${Math.round(activePlan.actual.orderAmount)}M
+                </span>
+                <span className="text-xs text-gray-400 mb-0.5">
+                  / ${activePlan.target.orderAmount}M
+                </span>
+              </div>
+              <div className="w-full bg-gray-600 rounded-full h-1.5 mt-2">
+                <div
+                  className={`h-1.5 rounded-full ${
+                    (activePlan.actual.orderAmount / activePlan.target.orderAmount) >= 1
+                      ? 'bg-green-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (activePlan.actual.orderAmount / activePlan.target.orderAmount) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 수주 척수 */}
+            <div className="bg-gray-700/50 p-3 rounded-lg">
+              <p className="text-xs text-gray-400 mb-1">수주 척수</p>
+              <div className="flex items-end gap-2">
+                <span className="text-lg font-bold text-white">
+                  {activePlan.actual.orderCount}척
+                </span>
+                <span className="text-xs text-gray-400 mb-0.5">
+                  / {activePlan.target.orderCount}척
+                </span>
+              </div>
+              <div className="w-full bg-gray-600 rounded-full h-1.5 mt-2">
+                <div
+                  className={`h-1.5 rounded-full ${
+                    (activePlan.actual.orderCount / activePlan.target.orderCount) >= 1
+                      ? 'bg-green-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (activePlan.actual.orderCount / activePlan.target.orderCount) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 인도 척수 */}
+            <div className="bg-gray-700/50 p-3 rounded-lg">
+              <p className="text-xs text-gray-400 mb-1">인도 척수</p>
+              <div className="flex items-end gap-2">
+                <span className="text-lg font-bold text-white">
+                  {activePlan.actual.deliveryCount}척
+                </span>
+                <span className="text-xs text-gray-400 mb-0.5">
+                  / {activePlan.target.deliveryCount}척
+                </span>
+              </div>
+              <div className="w-full bg-gray-600 rounded-full h-1.5 mt-2">
+                <div
+                  className={`h-1.5 rounded-full ${
+                    (activePlan.actual.deliveryCount / activePlan.target.deliveryCount) >= 1
+                      ? 'bg-green-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, (activePlan.actual.deliveryCount / activePlan.target.deliveryCount) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 이익률 */}
+            <div className="bg-gray-700/50 p-3 rounded-lg">
+              <p className="text-xs text-gray-400 mb-1">이익률</p>
+              <div className="flex items-end gap-2">
+                <span className={`text-lg font-bold ${
+                  activePlan.actual.actualProfitMargin >= activePlan.scenarioConfig.targetProfitMargin
+                    ? 'text-green-400' : 'text-yellow-400'
+                }`}>
+                  {(activePlan.actual.actualProfitMargin * 100).toFixed(1)}%
+                </span>
+                <span className="text-xs text-gray-400 mb-0.5">
+                  목표 {(activePlan.scenarioConfig.targetProfitMargin * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 관리지표 비교 */}
+          <div className="border-t border-gray-700 pt-4">
+            <h3 className="text-sm font-semibold text-gray-300 mb-3">관리지표</h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">시수 (MH/GT)</p>
+                <p className={`text-lg font-bold ${
+                  activePlan.actual.actualManHoursPerGT <= activePlan.scenarioConfig.targetManHoursPerGT
+                    ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {activePlan.actual.actualManHoursPerGT > 0
+                    ? activePlan.actual.actualManHoursPerGT.toFixed(1)
+                    : '-'}
+                </p>
+                <p className="text-xs text-gray-500">목표: {activePlan.scenarioConfig.targetManHoursPerGT}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">고정비 비율</p>
+                <p className={`text-lg font-bold ${
+                  activePlan.actual.actualFixedCostRatio <= activePlan.scenarioConfig.fixedCostRatio
+                    ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {activePlan.actual.actualFixedCostRatio > 0
+                    ? (activePlan.actual.actualFixedCostRatio * 100).toFixed(1) + '%'
+                    : '-'}
+                </p>
+                <p className="text-xs text-gray-500">목표: {(activePlan.scenarioConfig.fixedCostRatio * 100).toFixed(0)}%</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">외주 비율</p>
+                <p className="text-lg font-bold text-gray-400">
+                  {(activePlan.scenarioConfig.outsourcingRatio * 100).toFixed(0)}%
+                </p>
+                <p className="text-xs text-gray-500">(계획)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-blue-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-8 h-8 text-blue-400" />
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {currentDate.getFullYear()}년 사업계획 미설정
+                </h3>
+                <p className="text-sm text-gray-400">
+                  연간 목표와 시나리오를 설정하여 체계적인 경영을 시작하세요
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => openAnnualPlanDialog(currentDate.getFullYear())}
+              className="btn-primary"
+            >
+              계획 수립
+            </button>
           </div>
         </div>
       )}
