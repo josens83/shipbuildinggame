@@ -2,12 +2,16 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGameStore } from '../../store/gameStore';
+import { useDialogStore } from '../../store/dialogStore';
 import EventNotification from '../common/EventNotification';
 import ToastContainer from '../common/Toast';
-import ConfirmDialog, { useDialog } from '../common/ConfirmDialog';
+import ConfirmDialog from '../common/ConfirmDialog';
 import Tutorial from '../tutorial/Tutorial';
 import GameOver from '../GameOver';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+// 새로운 통합 다이얼로그 시스템
+import DialogManager from '../dialog/DialogManager';
+import MiniGameController from '../minigame/MiniGameController';
 import {
   Anchor,
   LayoutDashboard,
@@ -52,8 +56,8 @@ export default function Layout({ children }: LayoutProps) {
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
 
-  // Dialog hook
-  const { success: successDialog, alert: alertDialog } = useDialog();
+  // 새로운 통합 다이얼로그 훅
+  const { success: successDialog, alert: alertDialog } = useDialogStore();
 
   const navItems = [
     { path: '/', label: '대시보드', icon: LayoutDashboard },
@@ -262,7 +266,7 @@ export default function Layout({ children }: LayoutProps) {
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
 
-      {/* 이벤트 알림 */}
+      {/* 이벤트 알림 (기존) */}
       {activeEvent && (
         <EventNotification
           event={activeEvent}
@@ -271,17 +275,24 @@ export default function Layout({ children }: LayoutProps) {
         />
       )}
 
-      {/* 튜토리얼 */}
+      {/* 튜토리얼 (기존) */}
       <Tutorial />
 
       {/* 게임 종료 */}
       <GameOver />
 
-      {/* 토스트 알림 */}
+      {/* 토스트 알림 (기존) */}
       <ToastContainer />
 
-      {/* 확인 다이얼로그 */}
+      {/* 확인 다이얼로그 (기존) */}
       <ConfirmDialog />
+
+      {/* ===== 새로운 통합 다이얼로그 시스템 ===== */}
+      {/* 미니게임 컨트롤러 */}
+      <MiniGameController />
+
+      {/* 통합 다이얼로그 매니저 */}
+      <DialogManager />
     </div>
   );
 }
