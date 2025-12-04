@@ -11,7 +11,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 15000,
     capacity: 1000, // TEU
     estimatedCost: 25,
-    estimatedDays: 180,
+    designDays: 180,    // 6개월 설계
+    estimatedDays: 360, // 12개월 생산 = 총 18개월
     requiredDockSize: 'SMALL',
     complexity: 3,
   },
@@ -24,7 +25,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 65000,
     capacity: 5000,
     estimatedCost: 80,
-    estimatedDays: 360,
+    designDays: 240,    // 8개월 설계
+    estimatedDays: 480, // 16개월 생산 = 총 24개월
     requiredDockSize: 'MEDIUM',
     complexity: 5,
   },
@@ -37,7 +39,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 200000,
     capacity: 20000,
     estimatedCost: 150,
-    estimatedDays: 540,
+    designDays: 300,    // 10개월 설계
+    estimatedDays: 600, // 20개월 생산 = 총 30개월
     requiredDockSize: 'MEGA',
     complexity: 8,
   },
@@ -51,7 +54,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     width: 28,
     deadweight: 35000,
     estimatedCost: 28,
-    estimatedDays: 200,
+    designDays: 150,    // 5개월 설계
+    estimatedDays: 300, // 10개월 생산 = 총 15개월
     requiredDockSize: 'SMALL',
     complexity: 3,
   },
@@ -63,7 +67,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     width: 45,
     deadweight: 180000,
     estimatedCost: 55,
-    estimatedDays: 320,
+    designDays: 210,    // 7개월 설계
+    estimatedDays: 420, // 14개월 생산 = 총 21개월
     requiredDockSize: 'LARGE',
     complexity: 5,
   },
@@ -78,7 +83,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 45000,
     capacity: 50000,
     estimatedCost: 42,
-    estimatedDays: 250,
+    designDays: 180,    // 6개월 설계
+    estimatedDays: 360, // 12개월 생산 = 총 18개월
     requiredDockSize: 'MEDIUM',
     complexity: 4,
   },
@@ -91,12 +97,13 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 320000,
     capacity: 300000,
     estimatedCost: 95,
-    estimatedDays: 420,
+    designDays: 270,    // 9개월 설계
+    estimatedDays: 540, // 18개월 생산 = 총 27개월
     requiredDockSize: 'MEGA',
     complexity: 7,
   },
 
-  // LNG선
+  // LNG선 - 가장 복잡한 선종 중 하나
   'LNG_SMALL': {
     id: 'LNG_SMALL',
     type: 'LNG_CARRIER',
@@ -106,7 +113,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 10000,
     capacity: 10000,
     estimatedCost: 80,
-    estimatedDays: 400,
+    designDays: 300,    // 10개월 설계
+    estimatedDays: 450, // 15개월 생산 = 총 25개월
     requiredDockSize: 'SMALL',
     complexity: 7,
   },
@@ -119,7 +127,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 75000,
     capacity: 174000,
     estimatedCost: 200,
-    estimatedDays: 600,
+    designDays: 360,    // 12개월 설계
+    estimatedDays: 540, // 18개월 생산 = 총 30개월 (실제와 동일)
     requiredDockSize: 'LARGE',
     complexity: 9,
   },
@@ -134,12 +143,13 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     deadweight: 20000,
     capacity: 6500, // cars
     estimatedCost: 65,
-    estimatedDays: 300,
+    designDays: 210,    // 7개월 설계
+    estimatedDays: 420, // 14개월 생산 = 총 21개월
     requiredDockSize: 'MEDIUM',
     complexity: 5,
   },
 
-  // 크루즈선
+  // 크루즈선 - 가장 복잡한 선종
   'CRUISE_LUXURY': {
     id: 'CRUISE_LUXURY',
     type: 'CRUISE',
@@ -148,7 +158,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     width: 40,
     deadweight: 25000,
     estimatedCost: 800,
-    estimatedDays: 900,
+    designDays: 450,     // 15개월 설계
+    estimatedDays: 900,  // 30개월 생산 = 총 45개월
     requiredDockSize: 'MEGA',
     complexity: 10,
   },
@@ -162,7 +173,8 @@ export const SHIP_SPECIFICATIONS: Record<string, ShipSpecification> = {
     width: 42,
     deadweight: 40000,
     estimatedCost: 600,
-    estimatedDays: 750,
+    designDays: 360,     // 12개월 설계
+    estimatedDays: 720,  // 24개월 생산 = 총 36개월
     requiredDockSize: 'LARGE',
     complexity: 10,
   },
